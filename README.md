@@ -1,101 +1,48 @@
-# Finance Control 💚
+# Finora — Finance Control
 
-Dashboard de finanças pessoais premium com Next.js 14, React, TypeScript e Tailwind CSS.
+Dashboard de finanças pessoais construído com Next.js 14, React, TypeScript e Tailwind CSS.
 
 ## Tecnologias
 
-- **Next.js 14** (App Router)
-- **React 18**
-- **TypeScript**
+- **Next.js 14** com App Router
+- **React 18** e **TypeScript**
 - **Tailwind CSS**
-- **Recharts** — gráficos interativos
+- **Recharts** — gráficos (dependência disponível no projeto)
 - **Lucide React** — ícones
-- **Framer Motion** — animações
+- **Framer Motion** — animações (dependência disponível no projeto)
 
-## Como rodar
+## Rodar localmente
 
-### 1. Pré-requisito: instalar Node.js
+Pré-requisitos: Node.js LTS e npm.
 
-Acesse [nodejs.org](https://nodejs.org) e instale a versão **LTS**.
-
-Confirme a instalação:
-```bash
-node -v
-npm -v
-```
-
-### 2. Instalar as dependências
-
-Na pasta do projeto:
 ```bash
 npm install
-```
-
-### 3. Rodar em modo desenvolvimento
-
-```bash
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) no navegador.
+Abra [http://localhost:3000](http://localhost:3000).
 
-### 4. Build para produção
+Para gerar e iniciar a versão de produção:
 
 ```bash
 npm run build
 npm start
 ```
 
----
+## Interface atual
 
-## Estrutura do projeto
+A rota `/` apresenta o dashboard Finora, com resumo do saldo, indicadores, fluxo mensal, transações recentes, orçamento por categoria e progresso de uma meta. A interface se adapta a desktop e celular.
 
+Os valores são **dados demonstrativos**, sem conexão com banco ou instituição financeira. Filtros, ocultação de valores, exportação CSV e o formulário de nova transação funcionam no navegador, mas os dados adicionados existem apenas na sessão atual e são redefinidos ao recarregar a página. Não use a versão atual para registrar ou armazenar dados financeiros reais.
+
+## Estrutura
+
+```text
+app/
+├── dashboard.tsx       # Interface e interações do dashboard
+├── globals.css         # Tokens visuais e estilos responsivos
+├── layout.tsx          # Layout raiz e metadados
+└── page.tsx            # Rota inicial
+public/
+└── manus-routes.json   # Manifesto da rota disponível
 ```
-finance-control/
-├── app/
-│   ├── (dashboard)/
-│   │   ├── layout.tsx          ← Layout com sidebar
-│   │   ├── page.tsx            ← Dashboard principal
-│   │   ├── receitas/page.tsx
-│   │   ├── despesas/page.tsx
-│   │   ├── cartoes/page.tsx
-│   │   ├── metas/page.tsx
-│   │   ├── investimentos/page.tsx
-│   │   ├── relatorios/page.tsx
-│   │   └── configuracoes/page.tsx
-│   ├── globals.css
-│   └── layout.tsx
-├── components/
-│   ├── layout/
-│   │   ├── Sidebar.tsx
-│   │   └── Topbar.tsx
-│   ├── ui/
-│   │   ├── KpiCard.tsx
-│   │   ├── ChartCard.tsx
-│   │   ├── Badge.tsx
-│   │   └── ProgressBar.tsx
-│   └── charts/
-│       ├── RevenueChart.tsx
-│       ├── CategoryPieChart.tsx
-│       ├── PatrimonioChart.tsx
-│       ├── ReceitaAreaChart.tsx
-│       └── CustomTooltip.tsx
-├── lib/
-│   └── data.ts                 ← Dados mockados + helpers
-├── types/
-│   └── index.ts                ← Tipos TypeScript
-└── README.md
-```
-
-## Páginas disponíveis
-
-| Rota | Descrição |
-|------|-----------|
-| `/` | Dashboard principal com KPIs, gráficos e alertas |
-| `/receitas` | Gestão de receitas com histórico e formulário |
-| `/despesas` | Controle de gastos por categoria |
-| `/cartoes` | Cartões de crédito com limite e fatura |
-| `/metas` | Metas financeiras com progresso |
-| `/investimentos` | Carteira de investimentos e patrimônio |
-| `/relatorios` | Relatórios comparativos mensais/anuais |
-| `/configuracoes` | Perfil, preferências e segurança |
