@@ -293,7 +293,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .card-invoice-main small { color: #99a39b; font-size: 7px; }
 .card-invoice-due { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; color: #99a39b; font-size: 7px; }
 .card-invoice-due label { flex: 0 0 auto; }
-.card-invoice-date-input { width: 126px; max-width: 100%; min-height: 24px; padding: 2px 5px; border: 1px solid #e1e9e1; border-radius: 6px; background: #fff; color: #617064; font: inherit; font-size: 8px; }
+.card-invoice-date-input { width: 142px; max-width: 100%; min-height: 34px; padding: 4px 7px; border: 1px solid #e1e9e1; border-radius: 6px; background: #fff; color: #617064; font: inherit; font-size: 10px; cursor: pointer; }
 .card-invoice-date-input:focus-visible { outline: 2px solid #cbe3ce; outline-offset: 1px; border-color: #81b18a; }
 .invoice-month-label { text-transform: capitalize; }
 .card-invoice-total { display: grid; flex: 0 0 auto; justify-items: end; gap: 3px; }

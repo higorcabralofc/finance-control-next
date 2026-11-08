@@ -995,7 +995,11 @@ export default function Dashboard() {
 
   function changeCardInvoiceDueDate(invoiceKey: string, dueDate: string) {
     const invoice = creditCardInvoices.find((item) => item.key === invoiceKey);
-    if (!invoice || invoice.paidTransactionId || !/^\d+:\d{4}-\d{2}$/.test(invoiceKey) || !isDateInputValue(dueDate)) return;
+    if (!invoice || invoice.paidTransactionId || !/^\d+:\d{4}-\d{2}$/.test(invoiceKey)) return;
+    if (!isDateInputValue(dueDate)) {
+      announce("Escolha uma data válida no calendário para atualizar o vencimento.");
+      return;
+    }
     setCreditCardData((current) => ({
       ...current,
       dueDateOverrides: { ...(current.dueDateOverrides || {}), [invoiceKey]: dueDate },

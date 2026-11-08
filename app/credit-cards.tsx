@@ -252,7 +252,7 @@ function CreditCardModal({
             <label className="form-label">Dia de fechamento<input type="number" min={1} max={31} value={closingDayText} onChange={(event) => setClosingDayText(event.target.value)} required /></label>
             <label className="form-label">Dia de vencimento<input type="number" min={1} max={31} value={dueDayText} onChange={(event) => setDueDayText(event.target.value)} required /></label>
           </div>
-          <p className="card-form-note"><CreditCard size={13} /> Não informe número completo, validade ou código de segurança. Só os últimos quatro dígitos são armazenados.</p>
+          <p className="card-form-note"><CreditCard size={13} /> Em “Dia de fechamento” e “Dia de vencimento”, informe apenas o número do dia do mês (por exemplo, 5). A data completa pode ser escolhida diretamente em cada fatura aberta. Não informe número completo, validade ou código de segurança; só os últimos quatro dígitos são armazenados.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="modal-actions"><button type="button" className="button-quiet" onClick={onClose}>Cancelar</button><button type="submit" className="button-primary"><Check size={16} /> {card ? "Salvar alterações" : "Adicionar cartão"}</button></div>
         </form>
@@ -409,7 +409,7 @@ export function CreditCardManager({
               return (
                 <article className={`card-invoice ${invoice.paidTransactionId ? "card-invoice-paid" : ""}`} key={invoice.key}>
                   <div className="card-invoice-top">
-                    <div className="card-invoice-main"><span className="card-invoice-icon"><Receipt size={15} /></span><div><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div></div></div>
+                    <div className="card-invoice-main"><span className="card-invoice-icon"><Receipt size={15} /></span><div><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" title="Escolha a data no calendário; ela será salva automaticamente" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div></div></div>
                     <div className="card-invoice-total"><strong>{hidden ? "••••••" : money(invoice.amount)}</strong><span className={invoice.paidTransactionId ? "invoice-status-paid" : overdue ? "invoice-status-overdue" : "invoice-status-open"}>{invoice.paidTransactionId ? "Paga" : overdue ? "Vencida" : "Em aberto"}</span></div>
                   </div>
                   <details className="card-invoice-details">
