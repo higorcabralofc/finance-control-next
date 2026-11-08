@@ -1,101 +1,52 @@
-# Finance Control 💚
+# Finora — Finance Control
 
-Dashboard de finanças pessoais premium com Next.js 14, React, TypeScript e Tailwind CSS.
+Dashboard de finanças pessoais construído com Next.js 14, React, TypeScript e Tailwind CSS.
 
 ## Tecnologias
 
-- **Next.js 14** (App Router)
-- **React 18**
-- **TypeScript**
+- **Next.js 14** com App Router
+- **React 18** e **TypeScript**
 - **Tailwind CSS**
-- **Recharts** — gráficos interativos
+- **Recharts** — gráficos (dependência disponível no projeto)
 - **Lucide React** — ícones
-- **Framer Motion** — animações
+- **Framer Motion** — animações (dependência disponível no projeto)
 
-## Como rodar
+## Rodar localmente
 
-### 1. Pré-requisito: instalar Node.js
+Pré-requisitos: Node.js LTS e npm.
 
-Acesse [nodejs.org](https://nodejs.org) e instale a versão **LTS**.
-
-Confirme a instalação:
-```bash
-node -v
-npm -v
-```
-
-### 2. Instalar as dependências
-
-Na pasta do projeto:
 ```bash
 npm install
-```
-
-### 3. Rodar em modo desenvolvimento
-
-```bash
 npm run dev
 ```
 
-Abra [http://localhost:3000](http://localhost:3000) no navegador.
+Abra [http://localhost:3000](http://localhost:3000).
 
-### 4. Build para produção
+Para gerar e iniciar a versão de produção:
 
 ```bash
 npm run build
 npm start
 ```
 
----
+## Interface atual
 
-## Estrutura do projeto
+A rota `/` apresenta o dashboard Finora, com resumo do saldo, indicadores, fluxo mensal, transações recentes, despesas por categoria, cartões e objetivos. A interface se adapta a desktop e celular. O dashboard inicia com valores zerados e sem movimentações financeiras de exemplo. O saldo total desconta as despesas não vinculadas a dívidas e as parcelas ainda em aberto. Ao usar **Registrar pagamento**, a parcela fica no histórico como despesa e sai do total em aberto; o cálculo do saldo não desconta esse pagamento uma segunda vez.
 
+Na seção **Categorias**, é possível criar e excluir categorias de receitas e de despesas separadamente. Receitas e despesas podem ser excluídas individualmente pela lista de transações. Na seção **Dívidas parceladas**, é possível cadastrar o valor, a categoria, o número de parcelas e os vencimentos mensais; cada data pode ser editada antes ou depois de salvar. Na seção **Cartões**, é possível cadastrar cartões, limites e dias de fechamento/vencimento, lançar compras à vista ou parceladas, consultar as faturas geradas por ciclo e registrar seu pagamento. O cadastro do cartão recebe o número do dia do mês; alterar o fechamento ou vencimento recalcula as faturas em aberto para o novo padrão. Depois, o vencimento de cada fatura aberta também pode ser ajustado com uma data específica, válida apenas para aquele ciclo. O limite disponível considera as parcelas de todas as faturas ainda abertas. Faturas abertas também são descontadas do saldo total; registrar o pagamento cria uma despesa vinculada, libera o limite e evita dupla contagem no saldo. Somente os quatro últimos dígitos são opcionais; números completos, validade e código de segurança não devem ser informados. Na seção **Objetivos financeiros**, é possível criar metas e adicionar aportes para acompanhar seu progresso; aportes atualizam o objetivo e não são lançados como receita.
+
+Categorias, transações, dívidas, cartões, compras/faturas e objetivos ficam salvos no armazenamento local do navegador em uso e são restaurados ao recarregar a página. Esses dados não são enviados a um servidor, sincronizados entre dispositivos ou incluídos em backup; limpar os dados do navegador pode apagá-los.
+
+Os valores iniciais são zero e não há conexão com banco ou instituição financeira. Filtros, ocultação de valores, exportação CSV e o formulário de nova transação funcionam no navegador. Não use a versão atual como único local para registrar ou guardar dados financeiros importantes.
+
+## Estrutura
+
+```text
+app/
+├── dashboard.tsx       # Interface e interações do dashboard
+├── globals.css         # Tokens visuais e estilos responsivos
+├── layout.tsx          # Layout raiz e metadados
+└── page.tsx            # Rota inicial
+public/
+└── manus-routes.json   # Manifesto da rota disponível
 ```
-finance-control/
-├── app/
-│   ├── (dashboard)/
-│   │   ├── layout.tsx          ← Layout com sidebar
-│   │   ├── page.tsx            ← Dashboard principal
-│   │   ├── receitas/page.tsx
-│   │   ├── despesas/page.tsx
-│   │   ├── cartoes/page.tsx
-│   │   ├── metas/page.tsx
-│   │   ├── investimentos/page.tsx
-│   │   ├── relatorios/page.tsx
-│   │   └── configuracoes/page.tsx
-│   ├── globals.css
-│   └── layout.tsx
-├── components/
-│   ├── layout/
-│   │   ├── Sidebar.tsx
-│   │   └── Topbar.tsx
-│   ├── ui/
-│   │   ├── KpiCard.tsx
-│   │   ├── ChartCard.tsx
-│   │   ├── Badge.tsx
-│   │   └── ProgressBar.tsx
-│   └── charts/
-│       ├── RevenueChart.tsx
-│       ├── CategoryPieChart.tsx
-│       ├── PatrimonioChart.tsx
-│       ├── ReceitaAreaChart.tsx
-│       └── CustomTooltip.tsx
-├── lib/
-│   └── data.ts                 ← Dados mockados + helpers
-├── types/
-│   └── index.ts                ← Tipos TypeScript
-└── README.md
-```
-
-## Páginas disponíveis
-
-| Rota | Descrição |
-|------|-----------|
-| `/` | Dashboard principal com KPIs, gráficos e alertas |
-| `/receitas` | Gestão de receitas com histórico e formulário |
-| `/despesas` | Controle de gastos por categoria |
-| `/cartoes` | Cartões de crédito com limite e fatura |
-| `/metas` | Metas financeiras com progresso |
-| `/investimentos` | Carteira de investimentos e patrimônio |
-| `/relatorios` | Relatórios comparativos mensais/anuais |
-| `/configuracoes` | Perfil, preferências e segurança |
