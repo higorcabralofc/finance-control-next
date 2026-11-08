@@ -161,7 +161,7 @@ const categoryStorageKey = "finora:categories:v1";
 const transactionStorageKey = "finora:transactions:v1";
 const debtStorageKey = "finora:debts:v1";
 const goalsStorageKey = "finora:goals:v1";
-const emptyCreditCardStore: CreditCardStore = { cards: [], purchases: [], payments: [] };
+const emptyCreditCardStore: CreditCardStore = { cards: [], purchases: [], payments: [], dueDateOverrides: {} };
 
 const navigation: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Visão geral", href: "#inicio", icon: LayoutDashboard },
@@ -772,8 +772,13 @@ export default function Dashboard() {
       const saved = window.localStorage.getItem(cardStorageKey);
       if (saved) {
         const parsed: unknown = JSON.parse(saved);
-        if (isStoredCreditCardStore(parsed)) setCreditCardData(parsed);
-        else announce("Os dados salvos dos cartões não puderam ser validados; a lista foi iniciada vazia.");
+        if (isStoredCreditCardStore(parsed)) {
+          const dueDateOverrides: Record<string, string> = {};
+          Object.entries(parsed.dueDateOverrides || {}).forEach(([key, value]) => {
+            if (/^\d+:\d{4}-\d{2}$/.test(key) && isDateInputValue(value)) dueDateOverrides[key] = value;
+          });
+          setCreditCardData({ ...parsed, dueDateOverrides });
+        } else announce("Os dados salvos dos cartões não puderam ser validados; a lista foi iniciada vazia.");
       }
     } catch {
       announce("Não foi possível ler os cartões salvos neste navegador.");
@@ -962,6 +967,10 @@ export default function Dashboard() {
       cards: current.cards.filter((item) => item.id !== id),
       purchases: current.purchases.filter((purchase) => purchase.cardId !== id),
       payments: current.payments.filter((payment) => payment.cardId !== id),
+      dueDateOverrides: Object.keys(current.dueDateOverrides || {}).reduce<Record<string, string>>((dates, key) => {
+        if (!key.startsWith(`${id}:`)) dates[key] = current.dueDateOverrides![key];
+        return dates;
+      }, {}),
     }));
     announce("Cartão e histórico de compras associados excluídos.");
   }
@@ -982,6 +991,16 @@ export default function Dashboard() {
     if (!window.confirm(`Excluir a compra “${purchase.title}” de todas as faturas futuras?`)) return;
     setCreditCardData((current) => ({ ...current, purchases: current.purchases.filter((item) => item.id !== id) }));
     announce("Compra removida das faturas.");
+  }
+
+  function changeCardInvoiceDueDate(invoiceKey: string, dueDate: string) {
+    const invoice = creditCardInvoices.find((item) => item.key === invoiceKey);
+    if (!invoice || invoice.paidTransactionId || !/^\d+:\d{4}-\d{2}$/.test(invoiceKey) || !isDateInputValue(dueDate)) return;
+    setCreditCardData((current) => ({
+      ...current,
+      dueDateOverrides: { ...(current.dueDateOverrides || {}), [invoiceKey]: dueDate },
+    }));
+    announce("Data de vencimento da fatura atualizada.");
   }
 
   function payCreditCardInvoice(invoiceToPay: CreditCardInvoice) {
@@ -1093,7 +1112,7 @@ export default function Dashboard() {
                 <div className="transaction-list">{visibleTransactions.length ? (showAllTransactions ? visibleTransactions : visibleTransactions.slice(0, 5)).map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} onDelete={() => deleteTransaction(transaction.id)} />) : <p className="empty-state">Nenhuma transação encontrada.</p>}</div>
               </section>
               <DebtManager debts={debts} categories={categories} onSave={saveDebt} onDelete={deleteDebt} onPay={payInstallment} onDueDateChange={changeInstallmentDueDate} />
-              <CreditCardManager cards={creditCardData.cards} purchases={creditCardData.purchases} payments={creditCardData.payments} categories={categories.expense} hidden={hidden} onSaveCard={saveCreditCard} onDeleteCard={deleteCreditCard} onSavePurchase={saveCardPurchase} onDeletePurchase={deleteCardPurchase} onPayInvoice={payCreditCardInvoice} />
+              <CreditCardManager cards={creditCardData.cards} purchases={creditCardData.purchases} payments={creditCardData.payments} dueDateOverrides={creditCardData.dueDateOverrides || {}} categories={categories.expense} hidden={hidden} onSaveCard={saveCreditCard} onDeleteCard={deleteCreditCard} onSavePurchase={saveCardPurchase} onDeletePurchase={deleteCardPurchase} onChangeInvoiceDueDate={changeCardInvoiceDueDate} onPayInvoice={payCreditCardInvoice} />
             </div>
 
             <div className="dashboard-side-column">

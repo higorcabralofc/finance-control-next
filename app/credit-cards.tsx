@@ -33,6 +33,7 @@ export type CreditCardStore = {
   cards: CreditCardAccount[];
   purchases: CardPurchase[];
   payments: CardInvoicePayment[];
+  dueDateOverrides?: Record<string, string>;
 };
 
 export type CardInvoiceLine = {
@@ -138,7 +139,7 @@ function invoiceDueDate(invoiceMonth: string, closingDay: number, dueDay: number
   return `${dueYear}-${String(dueMonthNumber).padStart(2, "0")}-${String(Math.min(dueDay, finalDay)).padStart(2, "0")}`;
 }
 
-export function buildCreditCardInvoices(cards: CreditCardAccount[], purchases: CardPurchase[], payments: CardInvoicePayment[]): CreditCardInvoice[] {
+export function buildCreditCardInvoices(cards: CreditCardAccount[], purchases: CardPurchase[], payments: CardInvoicePayment[], dueDateOverrides: Record<string, string> = {}): CreditCardInvoice[] {
   const cardsById = new Map(cards.map((card) => [card.id, card]));
   const paymentsByKey = new Map(payments.map((payment) => [`${payment.cardId}:${payment.month}`, payment]));
   const groups = new Map<string, { cardId: number; month: string; amountCents: number; lines: CardInvoiceLine[] }>();
@@ -176,7 +177,7 @@ export function buildCreditCardInvoices(cards: CreditCardAccount[], purchases: C
       key,
       cardId: group.cardId,
       month: group.month,
-      dueDate: invoiceDueDate(group.month, card.closingDay, card.dueDay),
+      dueDate: isDateValue(dueDateOverrides[key]) ? dueDateOverrides[key] : invoiceDueDate(group.month, card.closingDay, card.dueDay),
       amount: group.amountCents / 100,
       lines: group.lines.sort((left, right) => left.title.localeCompare(right.title, "pt-BR")),
       paidTransactionId: payment?.paidTransactionId,
@@ -321,28 +322,32 @@ export function CreditCardManager({
   cards,
   purchases,
   payments,
+  dueDateOverrides,
   categories,
   hidden,
   onSaveCard,
   onDeleteCard,
   onSavePurchase,
   onDeletePurchase,
+  onChangeInvoiceDueDate,
   onPayInvoice,
 }: {
   cards: CreditCardAccount[];
   purchases: CardPurchase[];
   payments: CardInvoicePayment[];
+  dueDateOverrides: Record<string, string>;
   categories: string[];
   hidden: boolean;
   onSaveCard: (card: Omit<CreditCardAccount, "id"> & { id?: number }) => void;
   onDeleteCard: (id: number) => void;
   onSavePurchase: (purchase: Omit<CardPurchase, "id">) => void;
   onDeletePurchase: (id: number) => void;
+  onChangeInvoiceDueDate: (invoiceKey: string, dueDate: string) => void;
   onPayInvoice: (invoice: CreditCardInvoice) => void;
 }) {
   const [cardModal, setCardModal] = useState<CreditCardAccount | "new" | null>(null);
   const [purchaseCardId, setPurchaseCardId] = useState<number | null>(null);
-  const invoices = buildCreditCardInvoices(cards, purchases, payments);
+  const invoices = buildCreditCardInvoices(cards, purchases, payments, dueDateOverrides);
   const today = todayValue();
 
   function isPurchaseLocked(purchaseId: number) {
@@ -404,7 +409,7 @@ export function CreditCardManager({
               return (
                 <article className={`card-invoice ${invoice.paidTransactionId ? "card-invoice-paid" : ""}`} key={invoice.key}>
                   <div className="card-invoice-top">
-                    <div className="card-invoice-main"><span className="card-invoice-icon"><Receipt size={15} /></span><div><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><small>Vencimento {displayDate(invoice.dueDate)}{invoice.paidAt ? ` · paga em ${displayDate(invoice.paidAt)}` : ""}</small></div></div>
+                    <div className="card-invoice-main"><span className="card-invoice-icon"><Receipt size={15} /></span><div><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div></div></div>
                     <div className="card-invoice-total"><strong>{hidden ? "••••••" : money(invoice.amount)}</strong><span className={invoice.paidTransactionId ? "invoice-status-paid" : overdue ? "invoice-status-overdue" : "invoice-status-open"}>{invoice.paidTransactionId ? "Paga" : overdue ? "Vencida" : "Em aberto"}</span></div>
                   </div>
                   <details className="card-invoice-details">
@@ -426,7 +431,7 @@ export function CreditCardManager({
           </div>
         )}
       </div>
-      <p className="card-manager-footnote"><Wallet size={12} /> Compras e faturas são salvas neste navegador. Ao pagar uma fatura, o pagamento entra nas despesas e a fatura deixa de consumir o limite; não informe número completo nem código de segurança.</p>
+      <p className="card-manager-footnote"><Wallet size={12} /> Ajuste a data diretamente em cada fatura aberta; o dia padrão do cartão continua valendo para novos ciclos. Compras e faturas são salvas neste navegador. Ao pagar uma fatura, o pagamento entra nas despesas e a fatura deixa de consumir o limite; não informe número completo nem código de segurança.</p>
 
       {cardModal && <CreditCardModal key={cardModal === "new" ? "new-card" : `card-${cardModal.id}`} card={cardModal === "new" ? undefined : cardModal} onClose={() => setCardModal(null)} onSave={(card) => { onSaveCard(card); setCardModal(null); }} />}
       {purchaseCardId !== null && <CardPurchaseModal cards={cards} categories={categories} initialCardId={purchaseCardId} onClose={() => setPurchaseCardId(null)} onSave={(purchase) => { onSavePurchase(purchase); setPurchaseCardId(null); }} />}
