@@ -252,7 +252,7 @@ function CreditCardModal({
             <label className="form-label">Dia de fechamento<input type="number" min={1} max={31} value={closingDayText} onChange={(event) => setClosingDayText(event.target.value)} required /></label>
             <label className="form-label">Dia de vencimento<input type="number" min={1} max={31} value={dueDayText} onChange={(event) => setDueDayText(event.target.value)} required /></label>
           </div>
-          <p className="card-form-note"><CreditCard size={13} /> Em “Dia de fechamento” e “Dia de vencimento”, informe apenas o número do dia do mês (por exemplo, 5). A data completa pode ser escolhida diretamente em cada fatura aberta. Não informe número completo, validade ou código de segurança; só os últimos quatro dígitos são armazenados.</p>
+          <p className="card-form-note"><CreditCard size={13} /> Em “Dia de fechamento” e “Dia de vencimento”, informe apenas o número do dia do mês (por exemplo, 22). Ao alterar esses dias, as faturas em aberto são recalculadas pelo padrão do cartão; depois, você pode escolher uma data específica em cada fatura. Não informe número completo, validade ou código de segurança; só os últimos quatro dígitos são armazenados.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="modal-actions"><button type="button" className="button-quiet" onClick={onClose}>Cancelar</button><button type="submit" className="button-primary"><Check size={16} /> {card ? "Salvar alterações" : "Adicionar cartão"}</button></div>
         </form>

@@ -951,13 +951,22 @@ export default function Dashboard() {
 
   function saveCreditCard(card: Omit<CreditCardAccount, "id"> & { id?: number }) {
     const id = card.id ?? Date.now();
+    const previousCard = creditCardData.cards.find((item) => item.id === id);
+    const billingCycleChanged = Boolean(previousCard && (previousCard.closingDay !== card.closingDay || previousCard.dueDay !== card.dueDay));
+    const openInvoiceKeys = new Set(creditCardInvoices.filter((invoice) => invoice.cardId === id && !invoice.paidTransactionId).map((invoice) => invoice.key));
     setCreditCardData((current) => ({
       ...current,
       cards: card.id
         ? current.cards.map((item) => item.id === id ? { ...card, id } : item)
         : [{ ...card, id }, ...current.cards],
+      dueDateOverrides: billingCycleChanged
+        ? Object.keys(current.dueDateOverrides || {}).reduce<Record<string, string>>((dates, key) => {
+          if (!openInvoiceKeys.has(key)) dates[key] = current.dueDateOverrides![key];
+          return dates;
+        }, {})
+        : current.dueDateOverrides || {},
     }));
-    announce(card.id ? "Cartão atualizado." : "Cartão adicionado.");
+    announce(billingCycleChanged ? "Dia do cartão atualizado; as faturas em aberto foram ajustadas." : card.id ? "Cartão atualizado." : "Cartão adicionado.");
   }
 
   function deleteCreditCard(id: number) {
