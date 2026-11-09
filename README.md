@@ -29,6 +29,8 @@ npm run build
 npm start
 ```
 
+O `next dev` usa `.next-dev/`, separado de `.next/` usado pelo build de produção. Assim, rodar um build enquanto a prévia está aberta não apaga os arquivos CSS e módulos servidos por ela.
+
 ## Interface atual
 
 A rota `/` apresenta o dashboard Finora, com resumo do saldo, indicadores, fluxo mensal, transações recentes, despesas por categoria, cartões e objetivos. A interface se adapta a desktop e celular. O dashboard inicia com valores zerados e sem movimentações financeiras de exemplo. O saldo total desconta as despesas não vinculadas a dívidas e as parcelas ainda em aberto. Ao usar **Registrar pagamento**, a parcela fica no histórico como despesa e sai do total em aberto; o cálculo do saldo não desconta esse pagamento uma segunda vez.
