@@ -372,23 +372,32 @@ export function CreditCardManager({
             const nextInvoice = cardInvoices.find((invoice) => !invoice.paidTransactionId);
             return (
               <article className="credit-card-item" key={card.id}>
-                <div className="credit-card-visual">
-                  <div className="credit-card-visual-top"><span className="credit-card-chip" /><CreditCard size={20} /></div>
-                  <strong>{card.name}</strong>
-                  <span>{card.lastFour ? `••••  ••••  ••••  ${card.lastFour}` : "Cartão de crédito"}</span>
-                </div>
-                <div className="credit-card-details">
-                  <div className="credit-card-limit-row"><span>Limite total</span><strong>{hidden ? "••••••" : money(card.creditLimit)}</strong></div>
-                  <div className="credit-card-limit-row"><span>Em uso</span><strong>{hidden ? "••••••" : money(used)}</strong></div>
-                  <div className="credit-card-limit-row credit-card-available"><span>Disponível</span><strong>{hidden ? "••••••" : money(available)}</strong></div>
-                  <div className={`card-limit-track ${available < 0 ? "card-limit-exceeded" : ""}`}><span style={{ width: `${card.creditLimit > 0 ? Math.min(used / card.creditLimit * 100, 100) : 0}%` }} /></div>
-                  <p className="credit-card-cycle">Fecha dia {card.closingDay} · vence dia {card.dueDay}{nextInvoice ? ` · próxima fatura vence ${displayDate(nextInvoice.dueDate)}` : ""}</p>
-                  <div className="credit-card-actions">
-                    <button type="button" className="outline-button" onClick={() => setPurchaseCardId(card.id)}><Plus size={13} /> Lançar compra</button>
-                    <button type="button" className="card-icon-action" aria-label={`Editar ${card.name}`} title="Editar cartão" onClick={() => setCardModal(card)}><Pencil size={14} /></button>
-                    <button type="button" className="card-icon-action card-icon-delete" aria-label={`Excluir ${card.name}`} title="Excluir cartão" onClick={() => onDeleteCard(card.id)}><Trash2 size={14} /></button>
+                <details className="credit-card-disclosure">
+                  <summary className="credit-card-summary">
+                    <span className="credit-card-summary-icon"><CreditCard size={16} /></span>
+                    <span className="credit-card-summary-copy"><strong>{card.name}</strong><small>{card.lastFour ? `•••• ${card.lastFour}` : "Cartão de crédito"}{nextInvoice ? ` · fatura vence ${displayDate(nextInvoice.dueDate)}` : ""}</small></span>
+                    <span className="credit-card-summary-available"><small>Disponível</small><strong>{hidden ? "••••••" : money(available)}</strong></span>
+                  </summary>
+                  <div className="credit-card-expanded">
+                    <div className="credit-card-visual">
+                      <div className="credit-card-visual-top"><span className="credit-card-chip" /><CreditCard size={20} /></div>
+                      <strong>{card.name}</strong>
+                      <span>{card.lastFour ? `••••  ••••  ••••  ${card.lastFour}` : "Cartão de crédito"}</span>
+                    </div>
+                    <div className="credit-card-details">
+                      <div className="credit-card-limit-row"><span>Limite total</span><strong>{hidden ? "••••••" : money(card.creditLimit)}</strong></div>
+                      <div className="credit-card-limit-row"><span>Em uso</span><strong>{hidden ? "••••••" : money(used)}</strong></div>
+                      <div className="credit-card-limit-row credit-card-available"><span>Disponível</span><strong>{hidden ? "••••••" : money(available)}</strong></div>
+                      <div className={`card-limit-track ${available < 0 ? "card-limit-exceeded" : ""}`}><span style={{ width: `${card.creditLimit > 0 ? Math.min(used / card.creditLimit * 100, 100) : 0}%` }} /></div>
+                      <p className="credit-card-cycle">Fecha dia {card.closingDay} · vence dia {card.dueDay}{nextInvoice ? ` · próxima fatura vence ${displayDate(nextInvoice.dueDate)}` : ""}</p>
+                      <div className="credit-card-actions">
+                        <button type="button" className="outline-button" onClick={() => setPurchaseCardId(card.id)}><Plus size={13} /> Lançar compra</button>
+                        <button type="button" className="card-icon-action" aria-label={`Editar ${card.name}`} title="Editar cartão" onClick={() => setCardModal(card)}><Pencil size={14} /></button>
+                        <button type="button" className="card-icon-action card-icon-delete" aria-label={`Excluir ${card.name}`} title="Excluir cartão" onClick={() => onDeleteCard(card.id)}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </details>
               </article>
             );
           })}

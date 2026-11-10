@@ -559,3 +559,38 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
+
+
+/* Resumos compactos com detalhes financeiros sob demanda */
+.debt-card { position: relative; }
+.debt-card-summary { position: relative; padding-right: 74px; list-style: none; cursor: pointer; }
+.debt-card-summary::-webkit-details-marker, .credit-card-summary::-webkit-details-marker { display: none; }
+.debt-card-summary::after { position: absolute; top: 50%; right: 42px; display: grid; width: 20px; height: 20px; place-items: center; border-radius: 6px; background: #f3f7f3; color: #60856a; content: "+"; font-size: 14px; transform: translateY(-50%); }
+.debt-card-details[open] > .debt-card-summary::after { content: "−"; }
+.debt-card-summary:hover, .credit-card-summary:hover { background: #f9fcf9; }
+.debt-card-summary:focus-visible, .credit-card-summary:focus-visible { outline: 2px solid #97c7a0; outline-offset: -2px; }
+.debt-delete-button { position: absolute; top: 8px; right: 8px; z-index: 1; width: 27px; height: 27px; }
+.credit-card-item { display: block; padding: 0; }
+.credit-card-summary { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto 23px; align-items: center; gap: 10px; min-height: 68px; padding: 10px 12px; list-style: none; cursor: pointer; }
+.credit-card-summary::after { display: grid; width: 23px; height: 23px; place-items: center; border-radius: 7px; background: #f1f6f1; color: #588163; content: "+"; font-size: 15px; }
+.credit-card-disclosure[open] > .credit-card-summary::after { content: "−"; }
+.credit-card-summary-icon { display: grid; width: 32px; height: 32px; place-items: center; border-radius: 9px; background: #edf5ee; color: #5b9068; }
+.credit-card-summary-copy { display: grid; min-width: 0; gap: 4px; }
+.credit-card-summary-copy strong { overflow: hidden; color: #3f4d43; font-size: 10px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.credit-card-summary-copy small { overflow: hidden; color: #929e94; font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.credit-card-summary-available { display: grid; justify-items: end; gap: 3px; white-space: nowrap; }
+.credit-card-summary-available small { color: #89968d; font-size: 7px; }
+.credit-card-summary-available strong { color: #3f8053; font-size: 9px; font-weight: 700; }
+.credit-card-expanded { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.2fr); gap: 13px; padding: 11px; border-top: 1px solid #eef2ee; background: #fcfdfc; }
+.credit-card-expanded .credit-card-visual { min-height: 126px; }
+@media (max-width: 660px) {
+  .credit-card-expanded { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 390px) {
+  .debt-card-summary { gap: 7px; padding-right: 74px; padding-left: 9px; }
+  .credit-card-summary { grid-template-columns: 30px minmax(0, 1fr) auto 23px; gap: 6px; padding: 9px 8px; }
+  .credit-card-summary-copy small { max-width: 142px; }
+  .credit-card-summary-available small { font-size: 6px; }
+  .credit-card-summary-available strong { font-size: 8px; }
+  .credit-card-expanded { gap: 9px; padding: 0 8px 8px; }
+}

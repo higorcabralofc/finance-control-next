@@ -593,18 +593,20 @@ function DebtManager({
       <p className="debt-manager-description">Acompanhe o valor e o vencimento de cada parcela.</p>
       {debts.length === 0 ? <div className="debt-empty-state"><span><CalendarDays size={18} /></span><strong>Nenhuma dívida cadastrada</strong><small>Adicione uma compra parcelada para organizar os próximos vencimentos.</small></div> : <div className="debt-list">
         {debts.map((debt) => <article className="debt-card" key={debt.id}>
-          <div className="debt-card-heading">
-            <div className="debt-card-title"><strong>{debt.title}</strong><span>{debt.category} · {debt.installments.length} {debt.installments.length === 1 ? "parcela" : "parcelas"}</span></div>
-            <div className="debt-card-total"><strong>{formatCurrency(debt.totalAmount)}</strong><small>valor total</small></div>
-            <button type="button" className="row-delete-button debt-delete-button" aria-label={`Excluir dívida ${debt.title}`} title="Excluir dívida" onClick={() => onDelete(debt.id)}><Trash2 size={15} /></button>
-          </div>
-          <div className="debt-installment-list">
-            {debt.installments.map((installment) => <div className="debt-installment-row" key={installment.number}>
-              <span className="debt-installment-label">Parcela {installment.number}/{debt.installments.length}</span>
-              <label className="debt-date-label"><span className="sr-only">Vencimento da parcela {installment.number}</span><input type="date" value={installment.dueDate} onChange={(event) => onDueDateChange(debt.id, installment.number, event.target.value)} aria-label={`Vencimento da parcela ${installment.number} de ${debt.title}`} /></label>
-              <div className="debt-installment-value"><strong>{formatCurrency(installment.amount)}</strong>{installment.paidTransactionId ? <span className="debt-paid-status"><Check size={11} /> Pagamento lançado</span> : <button type="button" className="installment-pay-button" disabled={installment.amount <= 0} onClick={() => onPay(debt.id, installment.number)}><Check size={11} /> Registrar pagamento</button>}</div>
-            </div>)}
-          </div>
+          <details className="debt-card-details">
+            <summary className="debt-card-heading debt-card-summary">
+              <div className="debt-card-title"><strong>{debt.title}</strong><span>{debt.category} · {debt.installments.length} {debt.installments.length === 1 ? "parcela" : "parcelas"}</span></div>
+              <div className="debt-card-total"><strong>{formatCurrency(debt.totalAmount)}</strong><small>valor total</small></div>
+            </summary>
+            <div className="debt-installment-list">
+              {debt.installments.map((installment) => <div className="debt-installment-row" key={installment.number}>
+                <span className="debt-installment-label">Parcela {installment.number}/{debt.installments.length}</span>
+                <label className="debt-date-label"><span className="sr-only">Vencimento da parcela {installment.number}</span><input type="date" value={installment.dueDate} onChange={(event) => onDueDateChange(debt.id, installment.number, event.target.value)} aria-label={`Vencimento da parcela ${installment.number} de ${debt.title}`} /></label>
+                <div className="debt-installment-value"><strong>{formatCurrency(installment.amount)}</strong>{installment.paidTransactionId ? <span className="debt-paid-status"><Check size={11} /> Pagamento lançado</span> : <button type="button" className="installment-pay-button" disabled={installment.amount <= 0} onClick={() => onPay(debt.id, installment.number)}><Check size={11} /> Registrar pagamento</button>}</div>
+              </div>)}
+            </div>
+          </details>
+          <button type="button" className="row-delete-button debt-delete-button" aria-label={`Excluir dívida ${debt.title}`} title="Excluir dívida" onClick={() => onDelete(debt.id)}><Trash2 size={15} /></button>
         </article>)}
       </div>}
       <p className="debt-manager-footnote">O valor total fica acompanhado à parte e não reduz o saldo ao cadastrar a dívida. Cada parcela reduz o saldo somente quando você registra o pagamento.</p>
