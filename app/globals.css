@@ -109,7 +109,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .balance-eye:hover { background: rgba(255,255,255,.15); }
 .balance-content > p { display: flex; align-items: center; gap: 6px; margin: 0; color: #b3cabb; font-size: 10px; }
 .balance-change { display: inline-flex; align-items: center; gap: 2px; padding: 3px 6px; border: 1px solid rgba(151, 227, 176, .23); border-radius: 5px; background: rgba(157, 226, 177, .12); color: #a8e1ba; font-size: 9px; font-weight: 700; }
-.balance-breakdown { display: grid; flex: 1; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(12px, 2vw, 24px); max-width: 620px; margin: 0; }
+.balance-breakdown { display: grid; flex: 1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: clamp(12px, 2vw, 24px); max-width: 620px; margin: 0; }
 .balance-breakdown div { display: grid; gap: 9px; }
 .balance-breakdown span { color: #b2cabb; font-size: 10px; }
 .balance-breakdown strong { color: #fff; font-size: 15px; font-weight: 620; letter-spacing: -.3px; }

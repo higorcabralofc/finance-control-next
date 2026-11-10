@@ -607,7 +607,7 @@ function DebtManager({
           </div>
         </article>)}
       </div>}
-      <p className="debt-manager-footnote">As parcelas em aberto são descontadas do saldo total. Ao pagar, o valor pendente diminui; a despesa fica no histórico sem ser descontada uma segunda vez.</p>
+      <p className="debt-manager-footnote">O valor total fica acompanhado à parte e não reduz o saldo ao cadastrar a dívida. Cada parcela reduz o saldo somente quando você registra o pagamento.</p>
       {formOpen && <NewDebtModal onClose={() => setFormOpen(false)} onSave={saveDebt} categories={categories} />}
     </section>
   );
@@ -857,14 +857,15 @@ export default function Dashboard() {
   const outstandingDebt = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId ? 0 : installment.amount), 0), 0);
   const creditCardInvoices = useMemo(() => buildCreditCardInvoices(creditCardData.cards, creditCardData.purchases, creditCardData.payments), [creditCardData]);
   const outstandingCardInvoices = creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId ? 0 : invoice.amount), 0);
-  const debtPaymentTransactionIds = new Set<number>();
+  const cardInvoicePaymentTransactionIds = new Set<number>(creditCardData.payments.map((payment) => payment.paidTransactionId));
+  const linkedPaymentTransactionIds = new Set<number>(cardInvoicePaymentTransactionIds);
   debts.forEach((debt) => debt.installments.forEach((installment) => {
-    if (installment.paidTransactionId) debtPaymentTransactionIds.add(installment.paidTransactionId);
+    if (installment.paidTransactionId) linkedPaymentTransactionIds.add(installment.paidTransactionId);
   }));
-  creditCardData.payments.forEach((payment) => debtPaymentTransactionIds.add(payment.paidTransactionId));
-  const linkedPaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && debtPaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
-  const balanceExpenses = transactionTotals.expense - linkedPaymentExpenses;
-  const totalBalance = transactionTotals.income - balanceExpenses - outstandingDebt - outstandingCardInvoices;
+  const linkedPaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && linkedPaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
+  const cardInvoicePaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && cardInvoicePaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
+  const balanceExpenses = transactionTotals.expense - cardInvoicePaymentExpenses;
+  const totalBalance = transactionTotals.income - balanceExpenses - outstandingCardInvoices;
   const expensesByCategory = useMemo(() => transactions.reduce<Record<string, number>>((totals, transaction) => {
     if (transaction.kind === "expense") totals[transaction.category] = (totals[transaction.category] || 0) + transaction.amount;
     return totals;
@@ -1104,8 +1105,8 @@ export default function Dashboard() {
           </section>
 
           <section className="balance-banner" aria-label="Resumo do saldo">
-            <div className="balance-content"><span className="balance-label"><Wallet size={16} /> SALDO TOTAL</span><div className="balance-amount-row"><strong>{hidden ? "••••••••" : formatCurrency(totalBalance)}</strong><button className="balance-eye" type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button></div><p><span className="balance-change"><ArrowLeftRight size={14} /> Saldo após obrigações</span> receitas menos despesas sem vínculo, dívidas e faturas em aberto</p></div>
-            <div className="balance-breakdown"><div><span>Receitas cadastradas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.income)}</strong></div><div><span>Outras despesas</span><strong>{hidden ? "••••••" : formatCurrency(balanceExpenses)}</strong></div><div><span>Dívidas em aberto</span><strong>{hidden ? "••••••" : formatCurrency(outstandingDebt)}</strong></div><div><span>Faturas abertas</span><strong>{hidden ? "••••••" : formatCurrency(outstandingCardInvoices)}</strong></div></div>
+            <div className="balance-content"><span className="balance-label"><Wallet size={16} /> SALDO TOTAL</span><div className="balance-amount-row"><strong>{hidden ? "••••••••" : formatCurrency(totalBalance)}</strong><button className="balance-eye" type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button></div><p><span className="balance-change"><ArrowLeftRight size={14} /> Saldo disponível</span> Dívidas parceladas só reduzem o saldo quando uma parcela é paga.</p></div>
+            <div className="balance-breakdown"><div><span>Receitas cadastradas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.income)}</strong></div><div><span>Despesas lançadas</span><strong>{hidden ? "••••••" : formatCurrency(balanceExpenses)}</strong></div><div><span>Faturas abertas</span><strong>{hidden ? "••••••" : formatCurrency(outstandingCardInvoices)}</strong></div></div>
             <div className="banner-decoration banner-ring-one" /><div className="banner-decoration banner-ring-two" /><div className="banner-decoration banner-orb" />
           </section>
 
