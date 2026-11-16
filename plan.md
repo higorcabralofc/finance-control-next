@@ -2,7 +2,7 @@
 
 ## Direção aprovada
 
-Adicionar login pela conta Manus e persistência financeira no banco gerenciado do projeto, para que a mesma conta acesse seus dados em diferentes dispositivos. Importar os registros que já existem no navegador do usuário quando ele entrar pela primeira vez, sem sobrescrever dados que já estejam na nuvem e sem misturar dados de contas diferentes. O site continua com a visibilidade atual; este trabalho não o torna público.
+Adicionar login pela conta Manus e persistência financeira no banco gerenciado do projeto, para que a mesma conta acesse seus dados em diferentes dispositivos. Importar os registros que já existem no navegador do usuário quando ele entrar pela primeira vez, sem sobrescrever dados que já estejam na nuvem e sem misturar dados de contas diferentes. A hospedagem permanece Pública por escolha do usuário: qualquer pessoa pode abrir a tela de login, mas dados financeiros só ficam acessíveis após autenticação Manus.
 
 A interface permanece em português do Brasil e conserva a identidade visual já existente do Finora. O login não será uma tela genérica separada do produto: usará o mesmo visual de painéis verdes, superfícies claras e textos curtos e tranquilizadores.
 
@@ -27,7 +27,7 @@ A interface permanece em português do Brasil e conserva a identidade visual já
 - Converter o Next.js de exportação estática para aplicação servida por container, mantendo o App Router e a porta de runtime existente. Adicionar endpoints de OAuth, sessão, sincronização e uma rota de health não autenticada.
 - Remover a declaração de build e as rotas que dependem de saída estática somente quando o deploy de servidor estiver preparado; adicionar Dockerfile que instala pelo lockfile, compila e inicia o Next.js em produção.
 - Preservar manifesto, ícones, instalação e uso offline do PWA. Atualizar o service worker para cachear somente shell/recursos públicos e nunca cachear `/api`, OAuth, sessão ou respostas com dados financeiros. As alterações offline ficam apenas no cache local da conta com indicação de pendência; ao reconectar, usar o controle de revisão e pedir uma escolha explícita se outro dispositivo tiver alterado os mesmos dados.
-- Manter os dados da conta em uma linha/snapshot separado por usuário, com revisão e data de atualização; a aplicação controla sessões e acessos no backend. Não mudar a visibilidade do domínio.
+- Manter os dados da conta em uma linha/snapshot separado por usuário, com revisão e data de atualização; a aplicação controla sessões e acessos no backend. A visibilidade Pública do domínio foi mantida por escolha do usuário; isso não altera a exigência de autenticação nem expõe snapshots financeiros.
 
 ## Estrutura principal prevista
 

@@ -1,6 +1,6 @@
 # Finora — suas finanças em perspectiva
 
-Dashboard de finanças pessoais em português do Brasil, construído com Next.js 16.4.6, React 19, TypeScript e Tailwind CSS. O site permanece privado e mantém a interface responsiva e a identidade visual existente.
+Dashboard de finanças pessoais em português do Brasil, construído com Next.js 16.4.6, React 19, TypeScript e Tailwind CSS. O site permanece público: qualquer pessoa pode abrir a tela de login, mas os dados financeiros só são acessíveis após autenticação Manus; a interface responsiva e a identidade visual existente foram preservadas.
 
 ## Recursos e dados
 
