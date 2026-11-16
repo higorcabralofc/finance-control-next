@@ -488,15 +488,17 @@ function NewDebtModal({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState(categories.expense[0] || "");
   const [amount, setAmount] = useState("");
-  const [installmentCount, setInstallmentCount] = useState(3);
-  const [installmentCountText, setInstallmentCountText] = useState("3");
+  const [installmentCount, setInstallmentCount] = useState(1);
+  const [installmentCountText, setInstallmentCountText] = useState("");
   const [firstDueDate, setFirstDueDate] = useState(() => localDateInputValue(new Date()));
-  const [dueDates, setDueDates] = useState(() => monthlyDueDates(localDateInputValue(new Date()), 3));
+  const [dueDates, setDueDates] = useState(() => monthlyDueDates(localDateInputValue(new Date()), 1));
   const [scheduleError, setScheduleError] = useState("");
   const numericAmount = parseCurrencyInput(amount);
   const totalCents = Number.isFinite(numericAmount) && numericAmount > 0 ? Math.round(numericAmount * 100) : 0;
   const baseInstallmentCents = Math.floor(totalCents / installmentCount);
   const extraCents = totalCents % installmentCount;
+  const enteredCount = Number(installmentCountText);
+  const hasValidInstallmentCount = /^\d+$/.test(installmentCountText) && enteredCount >= 1 && enteredCount <= 60 && enteredCount === installmentCount;
 
   function changeInstallmentCount(value: string) {
     const nextText = value.replace(/\D/g, "").slice(0, 2);
@@ -521,8 +523,7 @@ function NewDebtModal({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const enteredCount = Number(installmentCountText);
-    if (!/^\d+$/.test(installmentCountText) || enteredCount < 1 || enteredCount > 60 || enteredCount !== installmentCount) {
+    if (!hasValidInstallmentCount) {
       setScheduleError("Informe uma quantidade inteira de parcelas entre 1 e 60.");
       return;
     }
@@ -551,10 +552,10 @@ function NewDebtModal({
             <label className="form-label">Categoria<select value={category} onChange={(event) => setCategory(event.target.value)} required>{categories.expense.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
           </div>
           <div className="form-row">
-            <label className="form-label">Número de parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={installmentCountText} onChange={(event) => changeInstallmentCount(event.target.value)} onFocus={(event) => event.currentTarget.select()} required /></label>
+            <label className="form-label">Número de parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="1–60" value={installmentCountText} onChange={(event) => changeInstallmentCount(event.target.value)} onFocus={(event) => event.currentTarget.select()} required /></label>
             <label className="form-label">Primeiro vencimento<input type="date" value={firstDueDate} onChange={(event) => changeFirstDueDate(event.target.value)} required /></label>
           </div>
-          <div className="debt-schedule-preview">
+          {hasValidInstallmentCount ? <div className="debt-schedule-preview">
             <div className="debt-schedule-heading"><strong>Vencimentos das parcelas</strong><span>Edite qualquer data antes de salvar.</span></div>
             <div className="debt-schedule-edit-list">
               {dueDates.map((dueDate, index) => <div className="debt-schedule-edit-row" key={index}>
@@ -564,7 +565,7 @@ function NewDebtModal({
               </div>)}
             </div>
             <p>O total é dividido em parcelas mensais; diferenças de centavos são distribuídas nas primeiras.</p>
-          </div>
+          </div> : <p className="card-form-note">Digite uma quantidade de 1 a 60 para gerar os vencimentos.</p>}
           {scheduleError && <p className="form-error" role="alert">{scheduleError}</p>}
           <div className="modal-actions"><button type="button" className="button-quiet" onClick={onClose}>Cancelar</button><button type="submit" className="button-primary"><Check size={16} /> Salvar dívida</button></div>
         </form>
