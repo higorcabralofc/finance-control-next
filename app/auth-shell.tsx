@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Check, Cloud, CloudOff, LoaderCircle, LockKeyhole, RefreshCw, ShieldCheck, Wallet } from "lucide-react";
 import Dashboard from "./dashboard";
+import ThemeToggle from "./theme-toggle";
 import {
   LEGACY_IMPORT_MARKER_KEY,
   OFFLINE_SESSION_KEY,
@@ -91,6 +92,7 @@ function LoginScreen({ busy, error, onLogin }: { busy: boolean; error: string; o
         <div className="auth-brand">
           <span className="auth-brand-mark"><i /><i /><i /></span>
           <span className="auth-brand-name">finora<span>.</span></span>
+          <ThemeToggle />
         </div>
         <div className="auth-icon"><Wallet size={23} /></div>
         <p className="eyebrow">SUAS FINANÇAS, NO SEU RITMO</p>

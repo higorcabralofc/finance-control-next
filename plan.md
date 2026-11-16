@@ -50,6 +50,7 @@ O guia oficial do Next.js 16 indica Node.js 20.9 ou superior; o ambiente atual u
 - **Movimento:** fintech editorial calma, reaproveitando o design já entregue do Finora.
 - **Princípios:** privacidade visível, linguagem simples, sincronização previsível e nenhuma mudança silenciosa de dados.
 - **Cores e layout:** manter verde profundo de marca, superfícies claras e dashboard móvel já existente; integrar login e estados de sincronização nos componentes atuais, sem redesenho amplo.
+- **Alternância de tema:** oferecer botão com ícones de lua/sol no painel e na tela de login; manter o modo claro como padrão e aplicar uma paleta escura em tons de carvão e verde-floresta a superfícies e textos; guardar a preferência somente neste navegador, sem sincronizá-la com os dados financeiros.
 - **Fontes consultadas:** guia oficial de upgrade do Next.js 16, documentação oficial do ESLint no Next.js, guia oficial do React 19 e notas oficiais do Next.js 16.4, ligados acima.
 - **Elementos e interação:** preservar cartões arredondados e o painel verde de saldo; dar feedback textual claro a cada estado de sessão/sync, com animação discreta apenas para carregamento.
 - **Tipografia e marca:** reutilizar as fontes, logotipo, ícones e microcopy atuais em português do Brasil.

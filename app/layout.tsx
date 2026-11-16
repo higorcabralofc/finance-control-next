@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import Script from "next/script";
 import "./globals.css";
+import "./theme.css";
 import PwaRegister from "./pwa-register";
 
 export const metadata: Metadata = {
@@ -26,8 +28,15 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <body>
+        <Script
+          id="finora-theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `try { const savedTheme = localStorage.getItem("finora:theme:v1"); document.documentElement.dataset.theme = savedTheme === "dark" ? "dark" : "light"; } catch { document.documentElement.dataset.theme = "light"; }`,
+          }}
+        />
         {children}
         <PwaRegister />
       </body>

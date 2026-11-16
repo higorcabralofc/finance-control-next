@@ -49,6 +49,7 @@ import {
   type CreditCardStore,
 } from "./credit-cards";
 import SyncConflictDialog from "./sync-conflict-dialog";
+import ThemeToggle from "./theme-toggle";
 import { useFinanceSync, type FinanceSyncStatus } from "@/lib/use-finance-sync";
 import { validateFinanceSnapshot, writeLocalFinanceSnapshot, type FinanceSnapshot, type OfflineSession } from "@/lib/finance-snapshot";
 
@@ -1182,6 +1183,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
           <div className="breadcrumb"><span>Finanças pessoais</span><span className="breadcrumb-divider">/</span><strong>Visão geral</strong></div>
           <div className="topbar-actions">
             <MonthPicker month={month} onChange={setMonth} />
+            <ThemeToggle />
             {searchOpen && <input className="top-search-input" autoFocus placeholder="Buscar transação..." value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar transação" />}
             <button className={`icon-button search-toggle ${searchOpen ? "icon-button-active" : ""}`} type="button" aria-label="Buscar" onClick={() => { setSearchOpen((value) => !value); setSearch(""); }}><Search size={18} /></button>
             <button className="icon-button notification-button" type="button" aria-label="Notificações" onClick={() => announce("Você está em dia com as suas finanças.")}><Bell size={18} /><i /></button>

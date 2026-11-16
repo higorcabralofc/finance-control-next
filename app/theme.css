@@ -1,0 +1,206 @@
+/* Alternância local de tema claro/escuro do Finora. */
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  border-color: #e7ede7;
+  background: #fff;
+  color: #627268;
+}
+.theme-toggle:hover {
+  border-color: #d5e4d7;
+  background: #f4f8f4;
+  color: #2f7046;
+}
+.auth-brand .theme-toggle { margin-left: auto; }
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #101713;
+  --paper: #17231b;
+  --ink: #e6eee8;
+  --muted: #a2b1a7;
+  --line: #2b3b31;
+  --forest: #16452f;
+  --forest-deep: #103522;
+  --mint: #274a34;
+  --green: #83d39b;
+  background: var(--canvas);
+}
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .app-shell,
+html[data-theme="dark"] .main-content {
+  background: var(--canvas);
+  color: var(--ink);
+}
+html[data-theme="dark"] .sidebar {
+  border-color: #29392f;
+  background: #141f18;
+}
+html[data-theme="dark"] .topbar {
+  border-color: #29392f;
+  background: rgba(20, 31, 24, .92);
+}
+html[data-theme="dark"] :is(.metric-card, .panel, .debt-card, .card-invoice, .transaction-modal, .toast, .auth-card, .auth-loading-card, .goal-item, .credit-card-item, .credit-card-expanded, .month-picker-menu, .sync-conflict-modal) {
+  border-color: var(--line);
+  background: var(--paper);
+  color: var(--ink);
+}
+html[data-theme="dark"] :is(.workspace-switcher, .upgrade-card, .debt-empty-state, .card-empty-state, .goal-empty-state, .debt-schedule-preview, .category-kind-tabs, .segmented-control, .kind-switch, .sync-conflict-choice, .auth-privacy) {
+  border-color: #304236;
+  background: #1b2a20;
+  color: #dce8df;
+}
+html[data-theme="dark"] .goal-card {
+  border-color: #314438;
+  background: linear-gradient(145deg, #1c2c21 0%, #17251c 100%);
+}
+html[data-theme="dark"] .insight-card {
+  border-color: #454434;
+  background: #25281f;
+}
+html[data-theme="dark"] .auth-screen {
+  background: radial-gradient(circle at 83% 14%, rgba(96, 174, 117, .12), transparent 29%), linear-gradient(145deg, #111a14 0%, #17231b 100%);
+}
+html[data-theme="dark"] .auth-card::before {
+  background: linear-gradient(90deg, #34784d, #62ad78, #a8d9b1);
+}
+html[data-theme="dark"] .modal-backdrop {
+  background: rgba(3, 9, 5, .72);
+}
+
+html[data-theme="dark"] :is(.brand-name, .workspace-label strong, .profile-copy strong, .breadcrumb strong, .month-picker > span, .welcome-row h1, .metric-value, .panel-heading h2, .transaction-name strong, .transaction-amount, .budget-total-row strong, .category-value, .debt-empty-state strong, .debt-card-title strong, .debt-card-total strong, .debt-installment-value > strong, .credit-card-summary-copy strong, .credit-card-summary-available strong, .credit-card-limit-row strong, .card-invoices-heading h3, .card-invoice-summary-main > strong, .card-invoice-main strong, .card-invoice-total > strong, .card-invoice-line > strong, .card-invoice-line > div strong, .card-empty-state > strong, .goal-empty-state strong, .goal-card h2, .goal-amounts strong, .goal-item-heading strong, .goal-item-values strong, .auth-brand-name, .auth-card h1, .auth-loading-card > strong, .modal-heading h2, .sync-conflict-modal h2, .sync-conflict-choice strong, .form-label) {
+  color: #e8f0e9;
+}
+html[data-theme="dark"] :is(.workspace-label small, .nav-caption, .eyebrow, .nav-link, .profile-copy small, .profile-button > svg, .breadcrumb, .month-picker, .month-option, .welcome-subtitle, .metric-top, .metric-note, .panel-subtitle, .chart-legend, .chart-total, .chart-grid-lines, .chart-months, .chart-footnote, .transaction-name small, .transaction-month, .empty-state, .budget-total-row, .budget-total-row small, .budget-hint, .category-name, .debt-manager-description, .debt-card-title span, .debt-card-total small, .debt-installment-label, .debt-manager-footnote, .credit-card-limit-row, .credit-card-cycle, .card-invoice-main small, .card-invoice-due, .card-invoice-details summary, .card-invoice-line > div small, .card-manager-footnote, .card-form-note, .category-manager-description, .managed-category-name, .category-manager-footnote, .goal-manager-footnote, .goal-modal-note, .goal-period, .goal-kicker, .goal-amounts span, .goal-progress-meta, .goal-item-heading small, .goal-item-values span, .goal-item-meta, .insight-card p:not(.eyebrow), .page-footer, .auth-card > .eyebrow, .auth-description, .auth-offline-note, .sync-conflict-copy, .sync-conflict-footnote, .conflict-choice small) {
+  color: #a4b2a8;
+}
+html[data-theme="dark"] :is(.nav-link-active, .trend-pill, .amount-positive, .chart-footnote strong, .chart-footnote a, .text-link, .panel-bottom-link, .upgrade-card a, .debt-add-button, .card-add-button, .goal-add-button, .credit-card-limit-row.credit-card-available span, .credit-card-limit-row.credit-card-available strong, .invoice-status-paid, .invoice-status-open, .invoice-status-overdue, .debt-paid-status, .auth-privacy svg, .auth-offline-note svg, .footer-lock) {
+  color: #91d6a2;
+}
+html[data-theme="dark"] .nav-link-active {
+  background: #213a29;
+}
+html[data-theme="dark"] .nav-link-active::before { background: #77c98d; }
+html[data-theme="dark"] .nav-link:hover,
+html[data-theme="dark"] .month-option:hover {
+  background: #20352a;
+  color: #b2e4bd;
+}
+html[data-theme="dark"] :is(.nav-count, .profile-avatar, .topbar-avatar, .credit-card-count, .card-invoice-count) {
+  background: #26382c;
+  color: #c1d7c6;
+}
+html[data-theme="dark"] .topbar-avatar { background: #294433; color: #d0e8d5; }
+
+html[data-theme="dark"] :is(.month-picker, .top-search-input, .debt-date-label input, .card-invoice-date-input, .debt-schedule-edit-row input, .category-add-form input, .goal-contribution-form input, .form-label input, .form-label select) {
+  border-color: #34473a;
+  background: #111b15;
+  color: #e2ebe4;
+}
+html[data-theme="dark"] :is(.top-search-input, .debt-date-label input, .card-invoice-date-input, .debt-schedule-edit-row input, .category-add-form input, .goal-contribution-form input, .form-label input)::placeholder {
+  color: #829187;
+}
+html[data-theme="dark"] :is(.icon-button:hover, .icon-button-active, .month-picker:hover, .month-picker[aria-expanded="true"], .outline-button:hover, .button-quiet:hover, .account-logout:hover, .card-invoices-toggle:hover) {
+  border-color: #3b5943;
+  background: #21352a;
+  color: #a8deb4;
+}
+html[data-theme="dark"] :is(.icon-button, .outline-button, .button-quiet, .account-logout, .card-invoices-toggle, .card-icon-action, .card-line-delete, .row-more, .row-delete-button, .goal-more, .theme-toggle) {
+  border-color: #304236;
+  color: #a7b6ab;
+}
+html[data-theme="dark"] .theme-toggle {
+  border-color: #34483a;
+  background: #1a281f;
+  color: #b9d3bf;
+}
+html[data-theme="dark"] .theme-toggle:hover {
+  border-color: #52775c;
+  background: #22382a;
+  color: #a4e0b1;
+}
+html[data-theme="dark"] :is(.outline-button, .button-quiet, .account-logout, .card-invoices-toggle, .card-icon-action) {
+  background: #19251d;
+}
+html[data-theme="dark"] .button-primary,
+html[data-theme="dark"] .auth-login-button {
+  border-color: #34734a;
+  background: #34734a;
+  color: #fff;
+}
+html[data-theme="dark"] :is(.button-primary:hover, .auth-login-button:hover:not(:disabled)) {
+  background: #3d8555;
+}
+html[data-theme="dark"] .month-option-active,
+html[data-theme="dark"] .segmented-control button.segment-active,
+html[data-theme="dark"] .kind-switch button.kind-active {
+  background: #294332;
+  color: #a8dfb4;
+}
+html[data-theme="dark"] .filter-tabs button span,
+html[data-theme="dark"] .card-invoice-summary::after,
+html[data-theme="dark"] .credit-card-summary::after,
+html[data-theme="dark"] .debt-card-summary::after {
+  background: #263a2c;
+  color: #a5d7ae;
+}
+html[data-theme="dark"] :is(.metric-mint, .category-mint, .metric-peach, .category-orange, .metric-lilac, .category-purple, .metric-blue, .category-blue, .transaction-icon, .transaction-icon-income, .card-invoice-icon, .credit-card-summary-icon, .goal-icon, .goal-spark, .chart-empty-icon, .toast > span) {
+  border-color: #34483a;
+  background: #26362b;
+  color: #9ed5a9;
+}
+html[data-theme="dark"] .transaction-icon { background: #3b2d26; color: #e4ab8d; }
+html[data-theme="dark"] .transaction-icon-income { background: #233c2b; color: #94d5a1; }
+html[data-theme="dark"] .category-orange, html[data-theme="dark"] .metric-peach { background: #3b2d26; color: #e5ae91; }
+html[data-theme="dark"] .category-blue, html[data-theme="dark"] .metric-blue { background: #243442; color: #a9cee2; }
+html[data-theme="dark"] .category-purple, html[data-theme="dark"] .metric-lilac { background: #342d43; color: #c7b7ef; }
+
+html[data-theme="dark"] :is(.workspace-switcher, .profile-button, .transaction-toolbar, .transaction-row, .budget-categories, .debt-installment-list, .debt-installment-row, .card-invoices-section, .card-invoice-details, .card-invoice-content, .card-invoice-lines, .goal-contribution-form, .goal-footer, .page-footer, .modal-actions, .debt-schedule-edit-row, .chart-footnote) {
+  border-color: #2b3b31;
+}
+html[data-theme="dark"] :is(.chart-grid-line) { stroke: #2b3b31; }
+html[data-theme="dark"] .chart-empty-state {
+  background: repeating-linear-gradient(to bottom, transparent 0, transparent 43px, #2b3b31 44px, transparent 45px);
+}
+html[data-theme="dark"] .chart-income-point { fill: #17231b; }
+html[data-theme="dark"] :is(.budget-meter, .category-track, .card-limit-track, .goal-item-progress, .goal-progress) {
+  background: #2a3b30;
+}
+html[data-theme="dark"] :is(.budget-meter span, .card-limit-track span, .goal-item-progress span, .goal-progress span) {
+  background: linear-gradient(90deg, #5eac73, #91d09c);
+}
+html[data-theme="dark"] .auth-icon {
+  border-color: #35543c;
+  background: #243b2b;
+  color: #a3d8ad;
+}
+html[data-theme="dark"] .auth-error {
+  border-color: #5a3933;
+  background: #352521;
+  color: #ffb5a5;
+}
+html[data-theme="dark"] :is(.form-error, .card-icon-delete:hover, .row-delete-button:hover, .card-line-delete:hover) {
+  color: #ff9d8d;
+}
+html[data-theme="dark"] .sync-status { border-color: #34483a; background: #1b2a20; color: #b8d9bf; }
+html[data-theme="dark"] .sync-status-pending,
+html[data-theme="dark"] .sync-status-syncing { border-color: #55492d; background: #302a1c; color: #e6cf8e; }
+html[data-theme="dark"] .sync-status-offline { border-color: #3a403a; background: #222923; color: #c1c9c1; }
+html[data-theme="dark"] :is(.sync-status-conflict, .sync-status-error, .sync-status-login-needed) { border-color: #583a34; background: #352521; color: #f0ae9e; }
+html[data-theme="dark"] .sync-conflict-choice-secondary {
+  border-color: #3a493d;
+  background: #202a23;
+  color: #bdc9bf;
+}
+html[data-theme="dark"] :is(.sync-conflict-choice-secondary strong, .conflict-choice-secondary strong) { color: #e0e9e2; }
+html[data-theme="dark"] .sync-conflict-choice-secondary:hover:not(:disabled) { background: #29382d; }
+html[data-theme="dark"] .auth-privacy { border-color: #2c3d32; background: #1a281f; }
+html[data-theme="dark"] ::selection { background: #356d47; color: #fff; }
+
+@media (max-width: 660px) {
+  .theme-toggle { width: 32px; height: 32px; }
+}
+@media (max-width: 390px) {
+  .theme-toggle { width: 30px; height: 30px; }
+}
