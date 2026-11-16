@@ -4,7 +4,6 @@ import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
-  Bell,
   BriefcaseBusiness,
   CalendarDays,
   Car,
@@ -50,6 +49,7 @@ import {
 } from "./credit-cards";
 import SyncConflictDialog from "./sync-conflict-dialog";
 import ThemeToggle from "./theme-toggle";
+import DebtNotificationCenter, { type DebtDueAlert } from "./debt-notifications";
 import { useFinanceSync, type FinanceSyncStatus } from "@/lib/use-finance-sync";
 import { validateFinanceSnapshot, writeLocalFinanceSnapshot, type FinanceSnapshot, type OfflineSession } from "@/lib/finance-snapshot";
 
@@ -153,11 +153,6 @@ function monthlyDueDates(firstDate: string, count: number) {
     dates.push(localDateInputValue(new Date(targetYear, targetMonthIndex, Math.min(day, finalDay))));
   }
   return dates;
-}
-
-function displayDueDate(value: string) {
-  if (!isDateInputValue(value)) return "Data inválida";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
 }
 
 const initialCategories: Record<TransactionKind, string[]> = {
@@ -746,12 +741,53 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [month, setMonth] = useState("Novembro 2026");
+  const [today, setToday] = useState(() => localDateInputValue(new Date()));
+  const lastDueToastSignature = useRef("");
   const announce = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2800);
   }, []);
 
+  useEffect(() => {
+    let timeoutId = 0;
+    const scheduleNextMidnight = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      timeoutId = window.setTimeout(() => {
+        setToday(localDateInputValue(new Date()));
+        scheduleNextMidnight();
+      }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
+    };
+    scheduleNextMidnight();
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
   const financeReady = transactionsReady && debtsReady && creditCardsReady && goalsReady && categoriesReady;
+  const debtDueAlerts = useMemo<DebtDueAlert[]>(() => debts.flatMap((debt) => debt.installments
+    .filter((installment) => !installment.paidTransactionId && installment.amount > 0
+      && isDateInputValue(installment.dueDate) && installment.dueDate <= today)
+    .map((installment) => ({
+      id: `${debt.id}:${installment.number}:${installment.dueDate}`,
+      debtTitle: debt.title,
+      installmentNumber: installment.number,
+      installmentCount: debt.installments.length,
+      amount: installment.amount,
+      dueDate: installment.dueDate,
+      overdue: installment.dueDate < today,
+    })))
+    .sort((first, second) => first.dueDate.localeCompare(second.dueDate)
+      || first.debtTitle.localeCompare(second.debtTitle, "pt-BR")
+      || first.installmentNumber - second.installmentNumber), [debts, today]);
+  const dueTodayAlerts = useMemo(() => debtDueAlerts.filter((alert) => alert.dueDate === today), [debtDueAlerts, today]);
+  useEffect(() => {
+    if (!financeReady || dueTodayAlerts.length === 0) return;
+    const signature = `${today}:${dueTodayAlerts.map((alert) => alert.id).join("|")}`;
+    if (lastDueToastSignature.current === signature) return;
+    lastDueToastSignature.current = signature;
+    announce(dueTodayAlerts.length === 1
+      ? "Hoje vence uma parcela de dívida. Confira o sino de Notificações."
+      : `Hoje vencem ${dueTodayAlerts.length} parcelas de dívidas. Confira o sino de Notificações.`);
+  }, [financeReady, dueTodayAlerts, today, announce]);
   const financeSnapshot = useMemo<FinanceSnapshot>(() => ({
     version: 1,
     transactions,
@@ -1186,7 +1222,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
             <ThemeToggle />
             {searchOpen && <input className="top-search-input" autoFocus placeholder="Buscar transação..." value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar transação" />}
             <button className={`icon-button search-toggle ${searchOpen ? "icon-button-active" : ""}`} type="button" aria-label="Buscar" onClick={() => { setSearchOpen((value) => !value); setSearch(""); }}><Search size={18} /></button>
-            <button className="icon-button notification-button" type="button" aria-label="Notificações" onClick={() => announce("Você está em dia com as suas finanças.")}><Bell size={18} /><i /></button>
+            <DebtNotificationCenter alerts={debtDueAlerts} hidden={hidden} />
             <SyncStatusIndicator status={sync.status} description={sync.message} />
             <button className="account-logout" type="button" onClick={handleLogout} aria-label={sync.status === "login-needed" ? "Entrar novamente para sincronizar" : "Sair da conta"} title={sync.status === "login-needed" ? `Conta de ${user.displayName} · Entrar novamente` : `Conta de ${user.displayName} · Sair`}><LogOut size={15} /><span>{sync.status === "login-needed" ? "Entrar novamente" : "Sair"}</span></button>
             <span className="topbar-avatar" aria-label={`Conta de ${user.displayName}`} title={user.displayName}>{user.displayName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "F"}</span>

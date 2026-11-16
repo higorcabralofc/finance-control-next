@@ -204,3 +204,39 @@ html[data-theme="dark"] ::selection { background: #356d47; color: #fff; }
 @media (max-width: 390px) {
   .theme-toggle { width: 30px; height: 30px; }
 }
+
+html[data-theme="dark"] .notification-count { border-color: #141f18; }
+html[data-theme="dark"] .debt-notification-panel {
+  border-color: #304236;
+  background: #17231b;
+  color: #e3ece5;
+}
+html[data-theme="dark"] .debt-notification-head,
+html[data-theme="dark"] .debt-notification-footnote { border-color: #2b3b31; }
+html[data-theme="dark"] .debt-notification-heading-copy strong,
+html[data-theme="dark"] .debt-notification-title-row strong,
+html[data-theme="dark"] .debt-notification-amount { color: #e0e9e2; }
+html[data-theme="dark"] :is(.debt-notification-heading-copy span, .debt-notification-copy p, .debt-notification-empty span, .debt-notification-overflow, .debt-notification-footnote) { color: #a4b2a8; }
+html[data-theme="dark"] .debt-notification-item {
+  border-color: #2b3b31;
+  background: #1b2a20;
+}
+html[data-theme="dark"] .debt-notification-icon {
+  background: #263b2c;
+  color: #9ed5a9;
+}
+html[data-theme="dark"] .debt-notification-title-row span {
+  background: #294332;
+  color: #a8dfb4;
+}
+html[data-theme="dark"] .debt-notification-item-overdue {
+  border-color: #4b3931;
+  background: #29231f;
+}
+html[data-theme="dark"] .debt-notification-item-overdue .debt-notification-icon,
+html[data-theme="dark"] .debt-notification-item-overdue .debt-notification-title-row span {
+  background: #3b2d26;
+  color: #e6ac91;
+}
+html[data-theme="dark"] .debt-notification-empty > svg { color: #91d6a2; }
+html[data-theme="dark"] .debt-notification-empty strong { color: #d5e2d8; }
