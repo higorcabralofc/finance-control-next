@@ -1,4 +1,3 @@
-"use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -10,6 +9,8 @@ import {
   CalendarDays,
   Car,
   Check,
+  Cloud,
+  CloudOff,
   ChevronDown,
   CreditCard,
   Download,
@@ -17,6 +18,8 @@ import {
   EyeOff,
   Home,
   LayoutDashboard,
+  LoaderCircle,
+  LogOut,
   Menu,
   MoreHorizontal,
   PiggyBank,
@@ -31,6 +34,7 @@ import {
   Utensils,
   Wallet,
   X,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -44,6 +48,9 @@ import {
   type CreditCardInvoice,
   type CreditCardStore,
 } from "./credit-cards";
+import SyncConflictDialog from "./sync-conflict-dialog";
+import { useFinanceSync, type FinanceSyncStatus } from "@/lib/use-finance-sync";
+import { validateFinanceSnapshot, writeLocalFinanceSnapshot, type FinanceSnapshot, type OfflineSession } from "@/lib/finance-snapshot";
 
 type TransactionKind = "income" | "expense";
 type FilterKind = "all" | TransactionKind;
@@ -173,6 +180,14 @@ const navigation: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Categorias", href: "#categorias", icon: Tag },
   { label: "Dívidas e parcelas", href: "#dividas", icon: CalendarDays },
 ];
+
+type DashboardProps = {
+  user: OfflineSession;
+  initialRevision: number;
+  initialPending: boolean;
+  offline: boolean;
+  onLogout: () => void;
+};
 
 const chartData = [
   { month: "Jan", income: 0, expense: 0 },
@@ -704,13 +719,13 @@ function GoalManager({
           </article>;
         })}
       </div>}
-      <p className="goal-manager-footnote">Objetivos e aportes são salvos neste navegador; aportes atualizam a meta, não são lançamentos de receita.</p>
+      <p className="goal-manager-footnote">Objetivos e aportes são sincronizados na sua conta; aportes atualizam a meta, não são lançamentos de receita.</p>
       {modalOpen && <NewGoalModal onClose={() => setModalOpen(false)} onSave={saveGoal} />}
     </section>
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user, initialRevision, initialPending, offline, onLogout }: DashboardProps) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [transactionsReady, setTransactionsReady] = useState(false);
   const [debts, setDebts] = useState<InstallmentDebt[]>([]);
@@ -734,6 +749,56 @@ export default function Dashboard() {
     setToast(message);
     window.setTimeout(() => setToast(""), 2800);
   }, []);
+
+  const financeReady = transactionsReady && debtsReady && creditCardsReady && goalsReady && categoriesReady;
+  const financeSnapshot = useMemo<FinanceSnapshot>(() => ({
+    version: 1,
+    transactions,
+    debts,
+    goals,
+    categories,
+    creditCards: {
+      cards: creditCardData.cards,
+      purchases: creditCardData.purchases,
+      payments: creditCardData.payments,
+      dueDateOverrides: creditCardData.dueDateOverrides || {},
+    },
+  }), [transactions, debts, goals, categories, creditCardData]);
+  const applyFinanceSnapshot = useCallback((nextSnapshot: FinanceSnapshot) => {
+    if (!validateFinanceSnapshot(nextSnapshot)) throw new Error("A versão financeira não passou na validação.");
+    const cardStore = nextSnapshot.creditCards as unknown as CreditCardStore;
+    if (!isStoredCreditCardStore(cardStore)) throw new Error("Os cartões recebidos não passaram na validação.");
+    writeLocalFinanceSnapshot(nextSnapshot);
+    setTransactions(nextSnapshot.transactions.filter(isStoredTransaction));
+    setDebts(nextSnapshot.debts.filter(isStoredDebt));
+    setGoals(nextSnapshot.goals.filter(isStoredGoal));
+    setCategories({
+      income: [...nextSnapshot.categories.income],
+      expense: [...nextSnapshot.categories.expense],
+    });
+    setCreditCardData({ ...cardStore, dueDateOverrides: { ...(cardStore.dueDateOverrides || {}) } });
+    setTransactionsReady(true);
+    setDebtsReady(true);
+    setGoalsReady(true);
+    setCategoriesReady(true);
+    setCreditCardsReady(true);
+    announce("Dados da conta sincronizados neste dispositivo.");
+  }, [announce]);
+  const sync = useFinanceSync({
+    user,
+    snapshot: financeSnapshot,
+    ready: financeReady,
+    initialRevision,
+    initialPending,
+    offline,
+    onApplySnapshot: applyFinanceSnapshot,
+  });
+
+  function handleLogout() {
+    if (["pending", "syncing", "offline", "error", "login-needed"].includes(sync.status)
+      && !window.confirm("Há alterações que podem ainda não ter chegado à nuvem. Elas continuarão guardadas neste dispositivo e serão enviadas quando você entrar novamente. Deseja sair?")) return;
+    onLogout();
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -1120,7 +1185,9 @@ export default function Dashboard() {
             {searchOpen && <input className="top-search-input" autoFocus placeholder="Buscar transação..." value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar transação" />}
             <button className={`icon-button search-toggle ${searchOpen ? "icon-button-active" : ""}`} type="button" aria-label="Buscar" onClick={() => { setSearchOpen((value) => !value); setSearch(""); }}><Search size={18} /></button>
             <button className="icon-button notification-button" type="button" aria-label="Notificações" onClick={() => announce("Você está em dia com as suas finanças.")}><Bell size={18} /><i /></button>
-            <span className="topbar-avatar" aria-label="Perfil">FC</span>
+            <SyncStatusIndicator status={sync.status} description={sync.message} />
+            <button className="account-logout" type="button" onClick={handleLogout} aria-label={sync.status === "login-needed" ? "Entrar novamente para sincronizar" : "Sair da conta"} title={sync.status === "login-needed" ? `Conta de ${user.displayName} · Entrar novamente` : `Conta de ${user.displayName} · Sair`}><LogOut size={15} /><span>{sync.status === "login-needed" ? "Entrar novamente" : "Sair"}</span></button>
+            <span className="topbar-avatar" aria-label={`Conta de ${user.displayName}`} title={user.displayName}>{user.displayName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "F"}</span>
           </div>
         </header>
 
@@ -1171,10 +1238,11 @@ export default function Dashboard() {
               <section className="insight-card"><span className="insight-icon"><PiggyBank size={17} /></span><div><p className="eyebrow">SEU PRÓXIMO PASSO</p><p>Registre uma movimentação para ver seus primeiros insights financeiros.</p></div><ArrowUpRight className="insight-arrow" size={16} /></section>
             </div>
           </div>
-          <footer className="page-footer"><span>Finora <span>·</span> cuidado com o seu dinheiro, sem complicação.</span><span>Seus dados ficam só com você <span className="footer-lock">◆</span></span></footer>
+          <footer className="page-footer"><span>Finora <span>·</span> cuidado com o seu dinheiro, sem complicação.</span><span>Seus dados ficam protegidos na sua conta <span className="footer-lock">◆</span></span></footer>
         </div>
       </main>
       {modalOpen && <NewTransactionModal onClose={() => setModalOpen(false)} onSave={saveTransaction} categories={categories} />}
+      {sync.conflict && <SyncConflictDialog onUseCloud={sync.resolveWithCloud} onUseDevice={() => { void sync.resolveWithDevice(); }} busy={sync.conflictBusy} />}
       {toast && <div className="toast" role="status"><span><Check size={15} /></span>{toast}</div>}
     </div>
   );
@@ -1182,4 +1250,27 @@ export default function Dashboard() {
 
 function TrendingUpIcon(props: React.ComponentProps<LucideIcon>) {
   return <ArrowUpRight {...props} />;
+}
+
+function SyncStatusIndicator({ status, description }: { status: FinanceSyncStatus; description: string }) {
+  const labels: Record<FinanceSyncStatus, string> = {
+    saved: "Sincronizado",
+    pending: "Pendente",
+    syncing: "Sincronizando",
+    offline: "Sem conexão",
+    conflict: "Conflito",
+    error: "Falha na sincronização",
+    "login-needed": "Entre novamente",
+  };
+  const icons: Record<FinanceSyncStatus, LucideIcon> = {
+    saved: Check,
+    pending: RefreshCw,
+    syncing: LoaderCircle,
+    offline: CloudOff,
+    conflict: RefreshCw,
+    error: CloudOff,
+    "login-needed": Cloud,
+  };
+  const Icon = icons[status];
+  return <span className={`sync-status sync-status-${status}`} role="status" aria-label={labels[status]} title={description || labels[status]}><Icon size={14} className={status === "syncing" ? "sync-icon-spin" : undefined} /><span>{labels[status]}</span></span>;
 }
