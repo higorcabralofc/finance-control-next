@@ -1,5 +1,8 @@
-import Dashboard from "./dashboard";
+import AuthShell from "./auth-shell";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default function HomePage() {
-  return <Dashboard />;
+  return <AuthShell />;
 }

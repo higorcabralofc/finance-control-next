@@ -3,6 +3,7 @@ node_modules/
 .next-dev/
 out/
 coverage/
+public/sw.js
 .env*
 !.env.example
 *.log

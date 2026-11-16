@@ -1,15 +1,15 @@
-"use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowDownLeft,
   ArrowLeftRight,
   ArrowUpRight,
-  Bell,
   BriefcaseBusiness,
   CalendarDays,
   Car,
   Check,
+  Cloud,
+  CloudOff,
   ChevronDown,
   CreditCard,
   Download,
@@ -17,6 +17,8 @@ import {
   EyeOff,
   Home,
   LayoutDashboard,
+  LoaderCircle,
+  LogOut,
   Menu,
   MoreHorizontal,
   PiggyBank,
@@ -31,6 +33,7 @@ import {
   Utensils,
   Wallet,
   X,
+  RefreshCw,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -44,6 +47,11 @@ import {
   type CreditCardInvoice,
   type CreditCardStore,
 } from "./credit-cards";
+import SyncConflictDialog from "./sync-conflict-dialog";
+import ThemeToggle from "./theme-toggle";
+import DebtNotificationCenter, { type DebtDueAlert } from "./debt-notifications";
+import { useFinanceSync, type FinanceSyncStatus } from "@/lib/use-finance-sync";
+import { validateFinanceSnapshot, writeLocalFinanceSnapshot, type FinanceSnapshot, type OfflineSession } from "@/lib/finance-snapshot";
 
 type TransactionKind = "income" | "expense";
 type FilterKind = "all" | TransactionKind;
@@ -147,11 +155,6 @@ function monthlyDueDates(firstDate: string, count: number) {
   return dates;
 }
 
-function displayDueDate(value: string) {
-  if (!isDateInputValue(value)) return "Data inválida";
-  return new Intl.DateTimeFormat("pt-BR", { dateStyle: "medium" }).format(new Date(`${value}T12:00:00`));
-}
-
 const initialCategories: Record<TransactionKind, string[]> = {
   expense: ["Alimentação", "Moradia", "Transporte", "Compras", "Assinaturas"],
   income: ["Trabalho", "Freelance", "Investimentos", "Reembolso", "Outros"],
@@ -173,6 +176,14 @@ const navigation: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Categorias", href: "#categorias", icon: Tag },
   { label: "Dívidas e parcelas", href: "#dividas", icon: CalendarDays },
 ];
+
+type DashboardProps = {
+  user: OfflineSession;
+  initialRevision: number;
+  initialPending: boolean;
+  offline: boolean;
+  onLogout: () => void;
+};
 
 const chartData = [
   { month: "Jan", income: 0, expense: 0 },
@@ -488,20 +499,28 @@ function NewDebtModal({
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState(categories.expense[0] || "");
   const [amount, setAmount] = useState("");
-  const [installmentCount, setInstallmentCount] = useState(3);
+  const [installmentCount, setInstallmentCount] = useState(1);
+  const [installmentCountText, setInstallmentCountText] = useState("");
   const [firstDueDate, setFirstDueDate] = useState(() => localDateInputValue(new Date()));
-  const [dueDates, setDueDates] = useState(() => monthlyDueDates(localDateInputValue(new Date()), 3));
+  const [dueDates, setDueDates] = useState(() => monthlyDueDates(localDateInputValue(new Date()), 1));
   const [scheduleError, setScheduleError] = useState("");
   const numericAmount = parseCurrencyInput(amount);
   const totalCents = Number.isFinite(numericAmount) && numericAmount > 0 ? Math.round(numericAmount * 100) : 0;
   const baseInstallmentCents = Math.floor(totalCents / installmentCount);
   const extraCents = totalCents % installmentCount;
+  const enteredCount = Number(installmentCountText);
+  const hasValidInstallmentCount = /^\d+$/.test(installmentCountText) && enteredCount >= 1 && enteredCount <= 60 && enteredCount === installmentCount;
 
   function changeInstallmentCount(value: string) {
-    const parsed = Number(value);
-    const nextCount = Math.max(1, Math.min(60, Number.isFinite(parsed) ? Math.trunc(parsed) || 1 : 1));
-    setInstallmentCount(nextCount);
-    setDueDates(monthlyDueDates(firstDueDate, nextCount));
+    const nextText = value.replace(/\D/g, "").slice(0, 2);
+    setInstallmentCountText(nextText);
+    setScheduleError("");
+    if (!nextText) return;
+
+    const parsed = Number(nextText);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 60) return;
+    setInstallmentCount(parsed);
+    setDueDates(monthlyDueDates(firstDueDate, parsed));
   }
 
   function changeFirstDueDate(value: string) {
@@ -515,6 +534,10 @@ function NewDebtModal({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!hasValidInstallmentCount) {
+      setScheduleError("Informe uma quantidade inteira de parcelas entre 1 e 60.");
+      return;
+    }
     if (!title.trim() || !category || !Number.isFinite(numericAmount) || numericAmount <= 0 || dueDates.length !== installmentCount || dueDates.some((date) => !isDateInputValue(date))) return;
     if (totalCents < installmentCount) {
       setScheduleError("A quantidade de parcelas não pode ser maior que o valor em centavos.");
@@ -540,10 +563,10 @@ function NewDebtModal({
             <label className="form-label">Categoria<select value={category} onChange={(event) => setCategory(event.target.value)} required>{categories.expense.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
           </div>
           <div className="form-row">
-            <label className="form-label">Número de parcelas<input type="number" min={1} max={60} step={1} value={installmentCount} onChange={(event) => changeInstallmentCount(event.target.value)} required /></label>
+            <label className="form-label">Número de parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="1–60" value={installmentCountText} onChange={(event) => changeInstallmentCount(event.target.value)} onFocus={(event) => event.currentTarget.select()} required /></label>
             <label className="form-label">Primeiro vencimento<input type="date" value={firstDueDate} onChange={(event) => changeFirstDueDate(event.target.value)} required /></label>
           </div>
-          <div className="debt-schedule-preview">
+          {hasValidInstallmentCount ? <div className="debt-schedule-preview">
             <div className="debt-schedule-heading"><strong>Vencimentos das parcelas</strong><span>Edite qualquer data antes de salvar.</span></div>
             <div className="debt-schedule-edit-list">
               {dueDates.map((dueDate, index) => <div className="debt-schedule-edit-row" key={index}>
@@ -553,7 +576,7 @@ function NewDebtModal({
               </div>)}
             </div>
             <p>O total é dividido em parcelas mensais; diferenças de centavos são distribuídas nas primeiras.</p>
-          </div>
+          </div> : <p className="card-form-note">Digite uma quantidade de 1 a 60 para gerar os vencimentos.</p>}
           {scheduleError && <p className="form-error" role="alert">{scheduleError}</p>}
           <div className="modal-actions"><button type="button" className="button-quiet" onClick={onClose}>Cancelar</button><button type="submit" className="button-primary"><Check size={16} /> Salvar dívida</button></div>
         </form>
@@ -593,21 +616,23 @@ function DebtManager({
       <p className="debt-manager-description">Acompanhe o valor e o vencimento de cada parcela.</p>
       {debts.length === 0 ? <div className="debt-empty-state"><span><CalendarDays size={18} /></span><strong>Nenhuma dívida cadastrada</strong><small>Adicione uma compra parcelada para organizar os próximos vencimentos.</small></div> : <div className="debt-list">
         {debts.map((debt) => <article className="debt-card" key={debt.id}>
-          <div className="debt-card-heading">
-            <div className="debt-card-title"><strong>{debt.title}</strong><span>{debt.category} · {debt.installments.length} {debt.installments.length === 1 ? "parcela" : "parcelas"}</span></div>
-            <div className="debt-card-total"><strong>{formatCurrency(debt.totalAmount)}</strong><small>valor total</small></div>
-            <button type="button" className="row-delete-button debt-delete-button" aria-label={`Excluir dívida ${debt.title}`} title="Excluir dívida" onClick={() => onDelete(debt.id)}><Trash2 size={15} /></button>
-          </div>
-          <div className="debt-installment-list">
-            {debt.installments.map((installment) => <div className="debt-installment-row" key={installment.number}>
-              <span className="debt-installment-label">Parcela {installment.number}/{debt.installments.length}</span>
-              <label className="debt-date-label"><span className="sr-only">Vencimento da parcela {installment.number}</span><input type="date" value={installment.dueDate} onChange={(event) => onDueDateChange(debt.id, installment.number, event.target.value)} aria-label={`Vencimento da parcela ${installment.number} de ${debt.title}`} /></label>
-              <div className="debt-installment-value"><strong>{formatCurrency(installment.amount)}</strong>{installment.paidTransactionId ? <span className="debt-paid-status"><Check size={11} /> Pagamento lançado</span> : <button type="button" className="installment-pay-button" disabled={installment.amount <= 0} onClick={() => onPay(debt.id, installment.number)}><Check size={11} /> Registrar pagamento</button>}</div>
-            </div>)}
-          </div>
+          <details className="debt-card-details">
+            <summary className="debt-card-heading debt-card-summary">
+              <div className="debt-card-title"><strong>{debt.title}</strong><span>{debt.category} · {debt.installments.length} {debt.installments.length === 1 ? "parcela" : "parcelas"}</span></div>
+              <div className="debt-card-total"><strong>{formatCurrency(debt.totalAmount)}</strong><small>valor total</small></div>
+            </summary>
+            <div className="debt-installment-list">
+              {debt.installments.map((installment) => <div className="debt-installment-row" key={installment.number}>
+                <span className="debt-installment-label">Parcela {installment.number}/{debt.installments.length}</span>
+                <label className="debt-date-label"><span className="sr-only">Vencimento da parcela {installment.number}</span><input type="date" value={installment.dueDate} onChange={(event) => onDueDateChange(debt.id, installment.number, event.target.value)} aria-label={`Vencimento da parcela ${installment.number} de ${debt.title}`} /></label>
+                <div className="debt-installment-value"><strong>{formatCurrency(installment.amount)}</strong>{installment.paidTransactionId ? <span className="debt-paid-status"><Check size={11} /> Pagamento lançado</span> : <button type="button" className="installment-pay-button" disabled={installment.amount <= 0} onClick={() => onPay(debt.id, installment.number)}><Check size={11} /> Registrar pagamento</button>}</div>
+              </div>)}
+            </div>
+          </details>
+          <button type="button" className="row-delete-button debt-delete-button" aria-label={`Excluir dívida ${debt.title}`} title="Excluir dívida" onClick={() => onDelete(debt.id)}><Trash2 size={15} /></button>
         </article>)}
       </div>}
-      <p className="debt-manager-footnote">As parcelas em aberto são descontadas do saldo total. Ao pagar, o valor pendente diminui; a despesa fica no histórico sem ser descontada uma segunda vez.</p>
+      <p className="debt-manager-footnote">O valor total fica acompanhado à parte e não reduz o saldo ao cadastrar a dívida. Cada parcela reduz o saldo somente quando você registra o pagamento.</p>
       {formOpen && <NewDebtModal onClose={() => setFormOpen(false)} onSave={saveDebt} categories={categories} />}
     </section>
   );
@@ -690,13 +715,13 @@ function GoalManager({
           </article>;
         })}
       </div>}
-      <p className="goal-manager-footnote">Objetivos e aportes são salvos neste navegador; aportes atualizam a meta, não são lançamentos de receita.</p>
+      <p className="goal-manager-footnote">Objetivos e aportes são sincronizados na sua conta; aportes atualizam a meta, não são lançamentos de receita.</p>
       {modalOpen && <NewGoalModal onClose={() => setModalOpen(false)} onSave={saveGoal} />}
     </section>
   );
 }
 
-export default function Dashboard() {
+export default function Dashboard({ user, initialRevision, initialPending, offline, onLogout }: DashboardProps) {
   const [transactions, setTransactions] = useState(initialTransactions);
   const [transactionsReady, setTransactionsReady] = useState(false);
   const [debts, setDebts] = useState<InstallmentDebt[]>([]);
@@ -716,10 +741,115 @@ export default function Dashboard() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [month, setMonth] = useState("Novembro 2026");
+  const [today, setToday] = useState(() => localDateInputValue(new Date()));
+  const lastDueToastSignature = useRef("");
   const announce = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(""), 2800);
   }, []);
+
+  useEffect(() => {
+    let timeoutId = 0;
+    const scheduleNextMidnight = () => {
+      const now = new Date();
+      const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 1);
+      timeoutId = window.setTimeout(() => {
+        setToday(localDateInputValue(new Date()));
+        scheduleNextMidnight();
+      }, Math.max(1000, nextMidnight.getTime() - now.getTime()));
+    };
+    scheduleNextMidnight();
+    return () => window.clearTimeout(timeoutId);
+  }, []);
+
+  const financeReady = transactionsReady && debtsReady && creditCardsReady && goalsReady && categoriesReady;
+  const debtDueAlerts = useMemo<DebtDueAlert[]>(() => debts.flatMap((debt) => debt.installments
+    .filter((installment) => !installment.paidTransactionId && installment.amount > 0
+      && isDateInputValue(installment.dueDate) && installment.dueDate <= today)
+    .map((installment) => ({
+      id: `${debt.id}:${installment.number}:${installment.dueDate}`,
+      debtTitle: debt.title,
+      installmentNumber: installment.number,
+      installmentCount: debt.installments.length,
+      amount: installment.amount,
+      dueDate: installment.dueDate,
+      overdue: installment.dueDate < today,
+    })))
+    .sort((first, second) => first.dueDate.localeCompare(second.dueDate)
+      || first.debtTitle.localeCompare(second.debtTitle, "pt-BR")
+      || first.installmentNumber - second.installmentNumber), [debts, today]);
+  const dueTodayAlerts = useMemo(() => debtDueAlerts.filter((alert) => alert.dueDate === today), [debtDueAlerts, today]);
+  useEffect(() => {
+    if (!financeReady || dueTodayAlerts.length === 0) return;
+    const signature = `${today}:${dueTodayAlerts.map((alert) => alert.id).join("|")}`;
+    if (lastDueToastSignature.current === signature) return;
+    lastDueToastSignature.current = signature;
+    announce(dueTodayAlerts.length === 1
+      ? "Hoje vence uma parcela de dívida. Confira o sino de Notificações."
+      : `Hoje vencem ${dueTodayAlerts.length} parcelas de dívidas. Confira o sino de Notificações.`);
+  }, [financeReady, dueTodayAlerts, today, announce]);
+  const financeSnapshot = useMemo<FinanceSnapshot>(() => ({
+    version: 1,
+    transactions,
+    debts,
+    goals,
+    categories,
+    creditCards: {
+      cards: creditCardData.cards,
+      purchases: creditCardData.purchases,
+      payments: creditCardData.payments,
+      dueDateOverrides: creditCardData.dueDateOverrides || {},
+    },
+  }), [transactions, debts, goals, categories, creditCardData]);
+  const applyFinanceSnapshot = useCallback((nextSnapshot: FinanceSnapshot) => {
+    if (!validateFinanceSnapshot(nextSnapshot)) throw new Error("A versão financeira não passou na validação.");
+    const cardStore = nextSnapshot.creditCards as unknown as CreditCardStore;
+    if (!isStoredCreditCardStore(cardStore)) throw new Error("Os cartões recebidos não passaram na validação.");
+    writeLocalFinanceSnapshot(nextSnapshot);
+    setTransactions(nextSnapshot.transactions.filter(isStoredTransaction));
+    setDebts(nextSnapshot.debts.filter(isStoredDebt));
+    setGoals(nextSnapshot.goals.filter(isStoredGoal));
+    setCategories({
+      income: [...nextSnapshot.categories.income],
+      expense: [...nextSnapshot.categories.expense],
+    });
+    setCreditCardData({ ...cardStore, dueDateOverrides: { ...(cardStore.dueDateOverrides || {}) } });
+    setTransactionsReady(true);
+    setDebtsReady(true);
+    setGoalsReady(true);
+    setCategoriesReady(true);
+    setCreditCardsReady(true);
+    announce("Dados da conta sincronizados neste dispositivo.");
+  }, [announce]);
+  const sync = useFinanceSync({
+    user,
+    snapshot: financeSnapshot,
+    ready: financeReady,
+    initialRevision,
+    initialPending,
+    offline,
+    onApplySnapshot: applyFinanceSnapshot,
+  });
+
+  function handleLogout() {
+    if (["pending", "syncing", "offline", "error", "login-needed"].includes(sync.status)
+      && !window.confirm("Há alterações que podem ainda não ter chegado à nuvem. Elas continuarão guardadas neste dispositivo e serão enviadas quando você entrar novamente. Deseja sair?")) return;
+    onLogout();
+  }
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    root.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     try {
@@ -857,14 +987,13 @@ export default function Dashboard() {
   const outstandingDebt = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId ? 0 : installment.amount), 0), 0);
   const creditCardInvoices = useMemo(() => buildCreditCardInvoices(creditCardData.cards, creditCardData.purchases, creditCardData.payments), [creditCardData]);
   const outstandingCardInvoices = creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId ? 0 : invoice.amount), 0);
-  const debtPaymentTransactionIds = new Set<number>();
+  const cardInvoicePaymentTransactionIds = new Set<number>(creditCardData.payments.map((payment) => payment.paidTransactionId));
+  const linkedPaymentTransactionIds = new Set<number>(cardInvoicePaymentTransactionIds);
   debts.forEach((debt) => debt.installments.forEach((installment) => {
-    if (installment.paidTransactionId) debtPaymentTransactionIds.add(installment.paidTransactionId);
+    if (installment.paidTransactionId) linkedPaymentTransactionIds.add(installment.paidTransactionId);
   }));
-  creditCardData.payments.forEach((payment) => debtPaymentTransactionIds.add(payment.paidTransactionId));
-  const linkedPaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && debtPaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
-  const balanceExpenses = transactionTotals.expense - linkedPaymentExpenses;
-  const totalBalance = transactionTotals.income - balanceExpenses - outstandingDebt - outstandingCardInvoices;
+  const linkedPaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && linkedPaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
+  const totalBalance = transactionTotals.income - transactionTotals.expense;
   const expensesByCategory = useMemo(() => transactions.reduce<Record<string, number>>((totals, transaction) => {
     if (transaction.kind === "expense") totals[transaction.category] = (totals[transaction.category] || 0) + transaction.amount;
     return totals;
@@ -1090,10 +1219,13 @@ export default function Dashboard() {
           <div className="breadcrumb"><span>Finanças pessoais</span><span className="breadcrumb-divider">/</span><strong>Visão geral</strong></div>
           <div className="topbar-actions">
             <MonthPicker month={month} onChange={setMonth} />
+            <ThemeToggle />
             {searchOpen && <input className="top-search-input" autoFocus placeholder="Buscar transação..." value={search} onChange={(event) => setSearch(event.target.value)} aria-label="Buscar transação" />}
             <button className={`icon-button search-toggle ${searchOpen ? "icon-button-active" : ""}`} type="button" aria-label="Buscar" onClick={() => { setSearchOpen((value) => !value); setSearch(""); }}><Search size={18} /></button>
-            <button className="icon-button notification-button" type="button" aria-label="Notificações" onClick={() => announce("Você está em dia com as suas finanças.")}><Bell size={18} /><i /></button>
-            <span className="topbar-avatar" aria-label="Perfil">FC</span>
+            <DebtNotificationCenter alerts={debtDueAlerts} hidden={hidden} />
+            <SyncStatusIndicator status={sync.status} description={sync.message} />
+            <button className="account-logout" type="button" onClick={handleLogout} aria-label={sync.status === "login-needed" ? "Entrar novamente para sincronizar" : "Sair da conta"} title={sync.status === "login-needed" ? `Conta de ${user.displayName} · Entrar novamente` : `Conta de ${user.displayName} · Sair`}><LogOut size={15} /><span>{sync.status === "login-needed" ? "Entrar novamente" : "Sair"}</span></button>
+            <span className="topbar-avatar" aria-label={`Conta de ${user.displayName}`} title={user.displayName}>{user.displayName.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "F"}</span>
           </div>
         </header>
 
@@ -1104,8 +1236,8 @@ export default function Dashboard() {
           </section>
 
           <section className="balance-banner" aria-label="Resumo do saldo">
-            <div className="balance-content"><span className="balance-label"><Wallet size={16} /> SALDO TOTAL</span><div className="balance-amount-row"><strong>{hidden ? "••••••••" : formatCurrency(totalBalance)}</strong><button className="balance-eye" type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button></div><p><span className="balance-change"><ArrowLeftRight size={14} /> Saldo após obrigações</span> receitas menos despesas sem vínculo, dívidas e faturas em aberto</p></div>
-            <div className="balance-breakdown"><div><span>Receitas cadastradas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.income)}</strong></div><div><span>Outras despesas</span><strong>{hidden ? "••••••" : formatCurrency(balanceExpenses)}</strong></div><div><span>Dívidas em aberto</span><strong>{hidden ? "••••••" : formatCurrency(outstandingDebt)}</strong></div><div><span>Faturas abertas</span><strong>{hidden ? "••••••" : formatCurrency(outstandingCardInvoices)}</strong></div></div>
+            <div className="balance-content"><span className="balance-label"><Wallet size={16} /> SALDO TOTAL</span><div className="balance-amount-row"><strong>{hidden ? "••••••••" : formatCurrency(totalBalance)}</strong><button className="balance-eye" type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button></div><p><span className="balance-change"><ArrowLeftRight size={14} /> Saldo disponível</span> Dívidas parceladas e faturas só reduzem o saldo quando são pagas.</p></div>
+            <div className="balance-breakdown"><div><span>Receitas cadastradas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.income)}</strong></div><div><span>Despesas lançadas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.expense)}</strong></div><div><span>Faturas abertas (não descontadas)</span><strong>{hidden ? "••••••" : formatCurrency(outstandingCardInvoices)}</strong></div></div>
             <div className="banner-decoration banner-ring-one" /><div className="banner-decoration banner-ring-two" /><div className="banner-decoration banner-orb" />
           </section>
 
@@ -1144,10 +1276,11 @@ export default function Dashboard() {
               <section className="insight-card"><span className="insight-icon"><PiggyBank size={17} /></span><div><p className="eyebrow">SEU PRÓXIMO PASSO</p><p>Registre uma movimentação para ver seus primeiros insights financeiros.</p></div><ArrowUpRight className="insight-arrow" size={16} /></section>
             </div>
           </div>
-          <footer className="page-footer"><span>Finora <span>·</span> cuidado com o seu dinheiro, sem complicação.</span><span>Seus dados ficam só com você <span className="footer-lock">◆</span></span></footer>
+          <footer className="page-footer"><span>Finora <span>·</span> cuidado com o seu dinheiro, sem complicação.</span><span>Seus dados ficam protegidos na sua conta <span className="footer-lock">◆</span></span></footer>
         </div>
       </main>
       {modalOpen && <NewTransactionModal onClose={() => setModalOpen(false)} onSave={saveTransaction} categories={categories} />}
+      {sync.conflict && <SyncConflictDialog onUseCloud={sync.resolveWithCloud} onUseDevice={() => { void sync.resolveWithDevice(); }} busy={sync.conflictBusy} />}
       {toast && <div className="toast" role="status"><span><Check size={15} /></span>{toast}</div>}
     </div>
   );
@@ -1155,4 +1288,27 @@ export default function Dashboard() {
 
 function TrendingUpIcon(props: React.ComponentProps<LucideIcon>) {
   return <ArrowUpRight {...props} />;
+}
+
+function SyncStatusIndicator({ status, description }: { status: FinanceSyncStatus; description: string }) {
+  const labels: Record<FinanceSyncStatus, string> = {
+    saved: "Sincronizado",
+    pending: "Pendente",
+    syncing: "Sincronizando",
+    offline: "Sem conexão",
+    conflict: "Conflito",
+    error: "Falha na sincronização",
+    "login-needed": "Entre novamente",
+  };
+  const icons: Record<FinanceSyncStatus, LucideIcon> = {
+    saved: Check,
+    pending: RefreshCw,
+    syncing: LoaderCircle,
+    offline: CloudOff,
+    conflict: RefreshCw,
+    error: CloudOff,
+    "login-needed": Cloud,
+  };
+  const Icon = icons[status];
+  return <span className={`sync-status sync-status-${status}`} role="status" aria-label={labels[status]} title={description || labels[status]}><Icon size={14} className={status === "syncing" ? "sync-icon-spin" : undefined} /><span>{labels[status]}</span></span>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { CalendarDays, Check, CreditCard, Pencil, Plus, Receipt, Trash2, Wallet, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, CreditCard, Pencil, Plus, Receipt, Trash2, Wallet, X } from "lucide-react";
 
 export type CreditCardAccount = {
   id: number;
@@ -307,7 +307,7 @@ function CardPurchaseModal({
           </div>
           <div className="form-row">
             <label className="form-label">Data da compra<input type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} required /></label>
-            <label className="form-label">Parcelas<input type="number" min={1} max={48} value={installmentsText} onChange={(event) => setInstallmentsText(event.target.value)} required /></label>
+            <label className="form-label">Parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={installmentsText} onChange={(event) => setInstallmentsText(event.target.value.replace(/\D/g, "").slice(0, 2))} onFocus={(event) => event.currentTarget.select()} required /></label>
           </div>
           <p className="card-form-note"><CalendarDays size={13} /> A primeira parcela entra na fatura conforme o fechamento do cartão; as próximas são distribuídas nos meses seguintes.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
@@ -347,6 +347,7 @@ export function CreditCardManager({
 }) {
   const [cardModal, setCardModal] = useState<CreditCardAccount | "new" | null>(null);
   const [purchaseCardId, setPurchaseCardId] = useState<number | null>(null);
+  const [invoicesCollapsed, setInvoicesCollapsed] = useState(false);
   const invoices = buildCreditCardInvoices(cards, purchases, payments, dueDateOverrides);
   const today = todayValue();
 
@@ -372,23 +373,32 @@ export function CreditCardManager({
             const nextInvoice = cardInvoices.find((invoice) => !invoice.paidTransactionId);
             return (
               <article className="credit-card-item" key={card.id}>
-                <div className="credit-card-visual">
-                  <div className="credit-card-visual-top"><span className="credit-card-chip" /><CreditCard size={20} /></div>
-                  <strong>{card.name}</strong>
-                  <span>{card.lastFour ? `••••  ••••  ••••  ${card.lastFour}` : "Cartão de crédito"}</span>
-                </div>
-                <div className="credit-card-details">
-                  <div className="credit-card-limit-row"><span>Limite total</span><strong>{hidden ? "••••••" : money(card.creditLimit)}</strong></div>
-                  <div className="credit-card-limit-row"><span>Em uso</span><strong>{hidden ? "••••••" : money(used)}</strong></div>
-                  <div className="credit-card-limit-row credit-card-available"><span>Disponível</span><strong>{hidden ? "••••••" : money(available)}</strong></div>
-                  <div className={`card-limit-track ${available < 0 ? "card-limit-exceeded" : ""}`}><span style={{ width: `${card.creditLimit > 0 ? Math.min(used / card.creditLimit * 100, 100) : 0}%` }} /></div>
-                  <p className="credit-card-cycle">Fecha dia {card.closingDay} · vence dia {card.dueDay}{nextInvoice ? ` · próxima fatura vence ${displayDate(nextInvoice.dueDate)}` : ""}</p>
-                  <div className="credit-card-actions">
-                    <button type="button" className="outline-button" onClick={() => setPurchaseCardId(card.id)}><Plus size={13} /> Lançar compra</button>
-                    <button type="button" className="card-icon-action" aria-label={`Editar ${card.name}`} title="Editar cartão" onClick={() => setCardModal(card)}><Pencil size={14} /></button>
-                    <button type="button" className="card-icon-action card-icon-delete" aria-label={`Excluir ${card.name}`} title="Excluir cartão" onClick={() => onDeleteCard(card.id)}><Trash2 size={14} /></button>
+                <details className="credit-card-disclosure">
+                  <summary className="credit-card-summary">
+                    <span className="credit-card-summary-icon"><CreditCard size={16} /></span>
+                    <span className="credit-card-summary-copy"><strong>{card.name}</strong><small>{card.lastFour ? `•••• ${card.lastFour}` : "Cartão de crédito"}{nextInvoice ? ` · fatura vence ${displayDate(nextInvoice.dueDate)}` : ""}</small></span>
+                    <span className="credit-card-summary-available"><small>Disponível</small><strong>{hidden ? "••••••" : money(available)}</strong></span>
+                  </summary>
+                  <div className="credit-card-expanded">
+                    <div className="credit-card-visual">
+                      <div className="credit-card-visual-top"><span className="credit-card-chip" /><CreditCard size={20} /></div>
+                      <strong>{card.name}</strong>
+                      <span>{card.lastFour ? `••••  ••••  ••••  ${card.lastFour}` : "Cartão de crédito"}</span>
+                    </div>
+                    <div className="credit-card-details">
+                      <div className="credit-card-limit-row"><span>Limite total</span><strong>{hidden ? "••••••" : money(card.creditLimit)}</strong></div>
+                      <div className="credit-card-limit-row"><span>Em uso</span><strong>{hidden ? "••••••" : money(used)}</strong></div>
+                      <div className="credit-card-limit-row credit-card-available"><span>Disponível</span><strong>{hidden ? "••••••" : money(available)}</strong></div>
+                      <div className={`card-limit-track ${available < 0 ? "card-limit-exceeded" : ""}`}><span style={{ width: `${card.creditLimit > 0 ? Math.min(used / card.creditLimit * 100, 100) : 0}%` }} /></div>
+                      <p className="credit-card-cycle">Fecha dia {card.closingDay} · vence dia {card.dueDay}{nextInvoice ? ` · próxima fatura vence ${displayDate(nextInvoice.dueDate)}` : ""}</p>
+                      <div className="credit-card-actions">
+                        <button type="button" className="outline-button" onClick={() => setPurchaseCardId(card.id)}><Plus size={13} /> Lançar compra</button>
+                        <button type="button" className="card-icon-action" aria-label={`Editar ${card.name}`} title="Editar cartão" onClick={() => setCardModal(card)}><Pencil size={14} /></button>
+                        <button type="button" className="card-icon-action card-icon-delete" aria-label={`Excluir ${card.name}`} title="Excluir cartão" onClick={() => onDeleteCard(card.id)}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                </details>
               </article>
             );
           })}
@@ -396,11 +406,11 @@ export function CreditCardManager({
       )}
 
       <div className="card-invoices-section">
-        <div className="card-invoices-heading"><div><span className="eyebrow">CICLOS DE COBRANÇA</span><h3>Faturas</h3></div><span className="card-invoice-count">{invoices.length}</span></div>
+        <div className="card-invoices-heading"><div><span className="eyebrow">CICLOS DE COBRANÇA</span><h3>Faturas</h3></div><div className="card-invoices-controls"><span className="card-invoice-count">{invoices.length}</span>{invoices.length > 0 && <button type="button" className="card-invoices-toggle" aria-expanded={!invoicesCollapsed} aria-controls="card-invoice-list" onClick={() => setInvoicesCollapsed((collapsed) => !collapsed)}><ChevronDown size={13} aria-hidden="true" /><span>{invoicesCollapsed ? "Mostrar faturas" : "Recolher faturas"}</span></button>}</div></div>
         {invoices.length === 0 ? (
           <div className="card-invoices-empty"><Receipt size={16} /><span>As faturas aparecerão aqui depois que você lançar uma compra.</span></div>
         ) : (
-          <div className="card-invoice-list">
+          <div id="card-invoice-list" className="card-invoice-list" hidden={invoicesCollapsed}>
             {invoices.map((invoice) => {
               const card = cards.find((item) => item.id === invoice.cardId);
               if (!card) return null;
@@ -408,23 +418,26 @@ export function CreditCardManager({
               const lockedPurchaseIds = new Set(invoice.lines.filter((line) => isPurchaseLocked(line.purchaseId)).map((line) => line.purchaseId));
               return (
                 <article className={`card-invoice ${invoice.paidTransactionId ? "card-invoice-paid" : ""}`} key={invoice.key}>
-                  <div className="card-invoice-top">
-                    <div className="card-invoice-main"><span className="card-invoice-icon"><Receipt size={15} /></span><div><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" title="Escolha a data no calendário; ela será salva automaticamente" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div></div></div>
-                    <div className="card-invoice-total"><strong>{hidden ? "••••••" : money(invoice.amount)}</strong><span className={invoice.paidTransactionId ? "invoice-status-paid" : overdue ? "invoice-status-overdue" : "invoice-status-open"}>{invoice.paidTransactionId ? "Paga" : overdue ? "Vencida" : "Em aberto"}</span></div>
-                  </div>
-                  <details className="card-invoice-details">
-                    <summary>Ver {invoice.lines.length} {invoice.lines.length === 1 ? "lançamento" : "lançamentos"}</summary>
-                    <div className="card-invoice-lines">
-                      {invoice.lines.map((line, index) => (
-                        <div className="card-invoice-line" key={`${invoice.key}-${line.purchaseId}-${line.installmentNumber}-${index}`}>
-                          <div><strong>{line.title}</strong><small>{line.category} · parcela {line.installmentNumber}/{line.installmentCount}</small></div>
-                          <strong>{hidden ? "••••" : money(line.amount)}</strong>
-                          {!lockedPurchaseIds.has(line.purchaseId) && <button type="button" className="card-line-delete" aria-label={`Excluir compra ${line.title}`} title="Excluir compra de todas as faturas" onClick={() => onDeletePurchase(line.purchaseId)}><Trash2 size={13} /></button>}
-                        </div>
-                      ))}
+                  <details className="card-invoice-disclosure">
+                    <summary className="card-invoice-summary">
+                      <span className="card-invoice-icon"><Receipt size={15} /></span>
+                      <span className="card-invoice-summary-main"><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><small>Vencimento {displayDate(invoice.dueDate)}</small></span>
+                      <span className="card-invoice-total"><strong>{hidden ? "••••••" : money(invoice.amount)}</strong><span className={invoice.paidTransactionId ? "invoice-status-paid" : overdue ? "invoice-status-overdue" : "invoice-status-open"}>{invoice.paidTransactionId ? "Paga" : overdue ? "Vencida" : "Em aberto"}</span></span>
+                    </summary>
+                    <div className="card-invoice-content">
+                      <div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" title="Escolha a data no calendário; ela será salva automaticamente" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div>
+                      <div className="card-invoice-lines">
+                        {invoice.lines.map((line, index) => (
+                          <div className="card-invoice-line" key={`${invoice.key}-${line.purchaseId}-${line.installmentNumber}-${index}`}>
+                            <div><strong>{line.title}</strong><small>{line.category} · parcela {line.installmentNumber}/{line.installmentCount}</small></div>
+                            <strong>{hidden ? "••••" : money(line.amount)}</strong>
+                            {!lockedPurchaseIds.has(line.purchaseId) && <button type="button" className="card-line-delete" aria-label={`Excluir compra ${line.title}`} title="Excluir compra de todas as faturas" onClick={() => onDeletePurchase(line.purchaseId)}><Trash2 size={13} /></button>}
+                          </div>
+                        ))}
+                      </div>
+                      {!invoice.paidTransactionId && <button type="button" className="card-invoice-pay" onClick={() => onPayInvoice(invoice)}><Check size={13} /> Registrar pagamento da fatura</button>}
                     </div>
                   </details>
-                  {!invoice.paidTransactionId && <button type="button" className="card-invoice-pay" onClick={() => onPayInvoice(invoice)}><Check size={13} /> Registrar pagamento da fatura</button>}
                 </article>
               );
             })}
