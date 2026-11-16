@@ -879,9 +879,7 @@ export default function Dashboard() {
     if (installment.paidTransactionId) linkedPaymentTransactionIds.add(installment.paidTransactionId);
   }));
   const linkedPaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && linkedPaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
-  const cardInvoicePaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && cardInvoicePaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
-  const balanceExpenses = transactionTotals.expense - cardInvoicePaymentExpenses;
-  const totalBalance = transactionTotals.income - balanceExpenses - outstandingCardInvoices;
+  const totalBalance = transactionTotals.income - transactionTotals.expense;
   const expensesByCategory = useMemo(() => transactions.reduce<Record<string, number>>((totals, transaction) => {
     if (transaction.kind === "expense") totals[transaction.category] = (totals[transaction.category] || 0) + transaction.amount;
     return totals;
@@ -1121,8 +1119,8 @@ export default function Dashboard() {
           </section>
 
           <section className="balance-banner" aria-label="Resumo do saldo">
-            <div className="balance-content"><span className="balance-label"><Wallet size={16} /> SALDO TOTAL</span><div className="balance-amount-row"><strong>{hidden ? "••••••••" : formatCurrency(totalBalance)}</strong><button className="balance-eye" type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button></div><p><span className="balance-change"><ArrowLeftRight size={14} /> Saldo disponível</span> Dívidas parceladas só reduzem o saldo quando uma parcela é paga.</p></div>
-            <div className="balance-breakdown"><div><span>Receitas cadastradas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.income)}</strong></div><div><span>Despesas lançadas</span><strong>{hidden ? "••••••" : formatCurrency(balanceExpenses)}</strong></div><div><span>Faturas abertas</span><strong>{hidden ? "••••••" : formatCurrency(outstandingCardInvoices)}</strong></div></div>
+            <div className="balance-content"><span className="balance-label"><Wallet size={16} /> SALDO TOTAL</span><div className="balance-amount-row"><strong>{hidden ? "••••••••" : formatCurrency(totalBalance)}</strong><button className="balance-eye" type="button" onClick={() => setHidden((value) => !value)} aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}>{hidden ? <EyeOff size={17} /> : <Eye size={17} />}</button></div><p><span className="balance-change"><ArrowLeftRight size={14} /> Saldo disponível</span> Dívidas parceladas e faturas só reduzem o saldo quando são pagas.</p></div>
+            <div className="balance-breakdown"><div><span>Receitas cadastradas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.income)}</strong></div><div><span>Despesas lançadas</span><strong>{hidden ? "••••••" : formatCurrency(transactionTotals.expense)}</strong></div><div><span>Faturas abertas (não descontadas)</span><strong>{hidden ? "••••••" : formatCurrency(outstandingCardInvoices)}</strong></div></div>
             <div className="banner-decoration banner-ring-one" /><div className="banner-decoration banner-ring-two" /><div className="banner-decoration banner-orb" />
           </section>
 
