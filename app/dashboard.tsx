@@ -489,6 +489,7 @@ function NewDebtModal({
   const [category, setCategory] = useState(categories.expense[0] || "");
   const [amount, setAmount] = useState("");
   const [installmentCount, setInstallmentCount] = useState(3);
+  const [installmentCountText, setInstallmentCountText] = useState("3");
   const [firstDueDate, setFirstDueDate] = useState(() => localDateInputValue(new Date()));
   const [dueDates, setDueDates] = useState(() => monthlyDueDates(localDateInputValue(new Date()), 3));
   const [scheduleError, setScheduleError] = useState("");
@@ -498,10 +499,15 @@ function NewDebtModal({
   const extraCents = totalCents % installmentCount;
 
   function changeInstallmentCount(value: string) {
-    const parsed = Number(value);
-    const nextCount = Math.max(1, Math.min(60, Number.isFinite(parsed) ? Math.trunc(parsed) || 1 : 1));
-    setInstallmentCount(nextCount);
-    setDueDates(monthlyDueDates(firstDueDate, nextCount));
+    const nextText = value.replace(/\D/g, "").slice(0, 2);
+    setInstallmentCountText(nextText);
+    setScheduleError("");
+    if (!nextText) return;
+
+    const parsed = Number(nextText);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 60) return;
+    setInstallmentCount(parsed);
+    setDueDates(monthlyDueDates(firstDueDate, parsed));
   }
 
   function changeFirstDueDate(value: string) {
@@ -515,6 +521,11 @@ function NewDebtModal({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const enteredCount = Number(installmentCountText);
+    if (!/^\d+$/.test(installmentCountText) || enteredCount < 1 || enteredCount > 60 || enteredCount !== installmentCount) {
+      setScheduleError("Informe uma quantidade inteira de parcelas entre 1 e 60.");
+      return;
+    }
     if (!title.trim() || !category || !Number.isFinite(numericAmount) || numericAmount <= 0 || dueDates.length !== installmentCount || dueDates.some((date) => !isDateInputValue(date))) return;
     if (totalCents < installmentCount) {
       setScheduleError("A quantidade de parcelas não pode ser maior que o valor em centavos.");
@@ -540,7 +551,7 @@ function NewDebtModal({
             <label className="form-label">Categoria<select value={category} onChange={(event) => setCategory(event.target.value)} required>{categories.expense.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
           </div>
           <div className="form-row">
-            <label className="form-label">Número de parcelas<input type="number" min={1} max={60} step={1} value={installmentCount} onChange={(event) => changeInstallmentCount(event.target.value)} required /></label>
+            <label className="form-label">Número de parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={installmentCountText} onChange={(event) => changeInstallmentCount(event.target.value)} onFocus={(event) => event.currentTarget.select()} required /></label>
             <label className="form-label">Primeiro vencimento<input type="date" value={firstDueDate} onChange={(event) => changeFirstDueDate(event.target.value)} required /></label>
           </div>
           <div className="debt-schedule-preview">
