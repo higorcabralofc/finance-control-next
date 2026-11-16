@@ -307,7 +307,7 @@ function CardPurchaseModal({
           </div>
           <div className="form-row">
             <label className="form-label">Data da compra<input type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} required /></label>
-            <label className="form-label">Parcelas<input type="number" min={1} max={48} value={installmentsText} onChange={(event) => setInstallmentsText(event.target.value)} required /></label>
+            <label className="form-label">Parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={installmentsText} onChange={(event) => setInstallmentsText(event.target.value.replace(/\D/g, "").slice(0, 2))} onFocus={(event) => event.currentTarget.select()} required /></label>
           </div>
           <p className="card-form-note"><CalendarDays size={13} /> A primeira parcela entra na fatura conforme o fechamento do cartão; as próximas são distribuídas nos meses seguintes.</p>
           {error && <p className="form-error" role="alert">{error}</p>}
