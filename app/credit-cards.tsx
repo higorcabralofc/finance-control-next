@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { CalendarDays, Check, CreditCard, Pencil, Plus, Receipt, Trash2, Wallet, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, CreditCard, Pencil, Plus, Receipt, Trash2, Wallet, X } from "lucide-react";
 
 export type CreditCardAccount = {
   id: number;
@@ -347,6 +347,7 @@ export function CreditCardManager({
 }) {
   const [cardModal, setCardModal] = useState<CreditCardAccount | "new" | null>(null);
   const [purchaseCardId, setPurchaseCardId] = useState<number | null>(null);
+  const [invoicesCollapsed, setInvoicesCollapsed] = useState(false);
   const invoices = buildCreditCardInvoices(cards, purchases, payments, dueDateOverrides);
   const today = todayValue();
 
@@ -405,11 +406,11 @@ export function CreditCardManager({
       )}
 
       <div className="card-invoices-section">
-        <div className="card-invoices-heading"><div><span className="eyebrow">CICLOS DE COBRANÇA</span><h3>Faturas</h3></div><span className="card-invoice-count">{invoices.length}</span></div>
+        <div className="card-invoices-heading"><div><span className="eyebrow">CICLOS DE COBRANÇA</span><h3>Faturas</h3></div><div className="card-invoices-controls"><span className="card-invoice-count">{invoices.length}</span>{invoices.length > 0 && <button type="button" className="card-invoices-toggle" aria-expanded={!invoicesCollapsed} aria-controls="card-invoice-list" onClick={() => setInvoicesCollapsed((collapsed) => !collapsed)}><ChevronDown size={13} aria-hidden="true" /><span>{invoicesCollapsed ? "Mostrar faturas" : "Recolher faturas"}</span></button>}</div></div>
         {invoices.length === 0 ? (
           <div className="card-invoices-empty"><Receipt size={16} /><span>As faturas aparecerão aqui depois que você lançar uma compra.</span></div>
         ) : (
-          <div className="card-invoice-list">
+          <div id="card-invoice-list" className="card-invoice-list" hidden={invoicesCollapsed}>
             {invoices.map((invoice) => {
               const card = cards.find((item) => item.id === invoice.cardId);
               if (!card) return null;

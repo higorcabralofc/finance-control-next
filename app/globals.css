@@ -619,3 +619,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .card-invoice-total > strong { font-size: 9px; }
   .card-invoice-content { padding: 8px; }
 }
+
+.card-invoices-controls { display: flex; align-items: center; gap: 8px; }
+.card-invoices-toggle { display: inline-flex; min-height: 27px; align-items: center; gap: 4px; padding: 0 7px; border: 1px solid #e4ece4; border-radius: 7px; background: #fff; color: #5a7860; font: inherit; font-size: 8px; font-weight: 600; cursor: pointer; }
+.card-invoices-toggle:hover { border-color: #c8ddca; background: #f7fbf7; }
+.card-invoices-toggle:focus-visible { outline: 2px solid #97c7a0; outline-offset: 2px; }
+.card-invoices-toggle svg { transition: transform .18s ease; }
+.card-invoices-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (max-width: 390px) {
+  .card-invoices-controls { gap: 5px; }
+  .card-invoices-toggle { min-height: 26px; gap: 3px; padding: 0 5px; font-size: 7px; }
+}
+.card-invoice-list[hidden] { display: none; }
