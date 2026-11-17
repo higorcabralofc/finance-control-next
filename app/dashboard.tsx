@@ -987,12 +987,9 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
   const outstandingDebt = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId ? 0 : installment.amount), 0), 0);
   const creditCardInvoices = useMemo(() => buildCreditCardInvoices(creditCardData.cards, creditCardData.purchases, creditCardData.payments), [creditCardData]);
   const outstandingCardInvoices = creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId ? 0 : invoice.amount), 0);
-  const cardInvoicePaymentTransactionIds = new Set<number>(creditCardData.payments.map((payment) => payment.paidTransactionId));
-  const linkedPaymentTransactionIds = new Set<number>(cardInvoicePaymentTransactionIds);
-  debts.forEach((debt) => debt.installments.forEach((installment) => {
-    if (installment.paidTransactionId) linkedPaymentTransactionIds.add(installment.paidTransactionId);
-  }));
-  const linkedPaymentExpenses = transactions.reduce((total, transaction) => total + (transaction.kind === "expense" && linkedPaymentTransactionIds.has(transaction.id) ? transaction.amount : 0), 0);
+  const linkedPaymentCents = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId ? Math.round(installment.amount * 100) : 0), 0), 0)
+    + creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId ? Math.round(invoice.amount * 100) : 0), 0);
+  const linkedPaymentExpenses = linkedPaymentCents / 100;
   const totalBalance = transactionTotals.income - transactionTotals.expense;
   const expensesByCategory = useMemo(() => transactions.reduce<Record<string, number>>((totals, transaction) => {
     if (transaction.kind === "expense") totals[transaction.category] = (totals[transaction.category] || 0) + transaction.amount;
@@ -1245,7 +1242,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
             <MetricCard label="Receitas" value={formatCurrency(transactionTotals.income)} note="Total cadastrado" icon={ArrowUpRight} tone="metric-mint" hidden={hidden} />
             <MetricCard label="Despesas" value={formatCurrency(transactionTotals.expense)} note="Inclui parcelas e faturas pagas" icon={ArrowDownLeft} tone="metric-peach" hidden={hidden} />
             <MetricCard label="Obrigações em aberto" value={formatCurrency(outstandingDebt + outstandingCardInvoices)} note="Dívidas e faturas não pagas" icon={CalendarDays} tone="metric-lilac" hidden={hidden} />
-            <MetricCard label="Pagamentos vinculados" value={formatCurrency(linkedPaymentExpenses)} note="Dívidas e faturas pagas" icon={Check} tone="metric-blue" hidden={hidden} />
+            <MetricCard label="Parcelas e faturas pagas" value={formatCurrency(linkedPaymentExpenses)} note="Soma dos valores marcados como pagos" icon={Check} tone="metric-blue" hidden={hidden} />
           </section>
 
           <div className="dashboard-grid">
