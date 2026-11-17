@@ -497,6 +497,7 @@ export function CreditCardManager({
   const [cardModal, setCardModal] = useState<CreditCardAccount | "new" | null>(null);
   const [purchaseCardId, setPurchaseCardId] = useState<number | null>(null);
   const [invoicesCollapsed, setInvoicesCollapsed] = useState(false);
+  const [recurringCollapsed, setRecurringCollapsed] = useState(true);
   const invoices = buildCreditCardInvoices(cards, purchases, payments, dueDateOverrides);
   const today = todayValue();
 
@@ -556,8 +557,14 @@ export function CreditCardManager({
       )}
 
       <section className="card-recurring-panel" aria-labelledby="card-recurring-title">
-        <div className="card-recurring-heading"><div><span className="eyebrow">ASSINATURAS</span><h3 id="card-recurring-title">Recorrências mensais</h3></div><span className="card-invoice-count">{recurringCharges.length}</span></div>
-        {recurringCharges.length === 0 ? <p className="card-recurring-empty">Ao lançar uma compra na categoria Assinaturas, marque “Repetir esta compra todo mês”. Você também pode ativar uma compra de assinatura de uma parcela já cadastrada.</p> : <div className="card-recurring-list">
+        <div className="card-recurring-heading">
+          <div><span className="eyebrow">ASSINATURAS</span><h3 id="card-recurring-title">Recorrências mensais</h3></div>
+          <div className="card-recurring-controls">
+            <span className="card-invoice-count" aria-label={`${recurringCharges.length} assinaturas ativas`}>{recurringCharges.length}</span>
+            {recurringCharges.length > 0 && <button type="button" className="card-invoices-toggle card-recurring-toggle" aria-expanded={!recurringCollapsed} aria-controls="card-recurring-list" aria-label={recurringCollapsed ? "Mostrar recorrências mensais" : "Recolher recorrências mensais"} onClick={() => setRecurringCollapsed((collapsed) => !collapsed)}><ChevronDown size={13} aria-hidden="true" /><span>{recurringCollapsed ? "Mostrar lista" : "Recolher lista"}</span></button>}
+          </div>
+        </div>
+        {recurringCharges.length === 0 ? <p className="card-recurring-empty">Ao lançar uma compra na categoria Assinaturas, marque “Repetir esta compra todo mês”. Você também pode ativar uma compra de assinatura de uma parcela já cadastrada.</p> : <div className="card-recurring-list" id="card-recurring-list" hidden={recurringCollapsed}>
           {recurringCharges.map((charge) => {
             const card = cards.find((item) => item.id === charge.cardId);
             return <article className="card-recurring-row" key={charge.id}>

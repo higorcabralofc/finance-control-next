@@ -353,7 +353,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .card-recurring-panel { margin-top: 12px; padding: 12px; border: 1px solid #e8eee8; border-radius: 11px; background: #fbfdfb; }
 .card-recurring-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .card-recurring-heading h3 { margin: 4px 0 0; color: #405549; font-size: 11px; font-weight: 680; }
+.card-recurring-controls { display: flex; flex: 0 0 auto; align-items: center; gap: 8px; }
+.card-recurring-toggle { white-space: nowrap; }
 .card-recurring-list { display: grid; gap: 7px; margin-top: 10px; }
+.card-recurring-list[hidden] { display: none; }
 .card-recurring-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px; border: 1px solid #edf1ed; border-radius: 8px; background: #fff; }
 .card-recurring-row > div { display: grid; min-width: 0; gap: 4px; }
 .card-recurring-row strong { overflow: hidden; color: #4d5f51; font-size: 9px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
@@ -684,6 +687,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .card-invoices-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
 @media (max-width: 390px) {
   .card-invoices-controls { gap: 5px; }
+  .card-recurring-controls { gap: 5px; }
   .card-invoices-toggle { min-height: 26px; gap: 3px; padding: 0 5px; font-size: 7px; }
 }
 .card-invoice-list[hidden] { display: none; }
