@@ -41,11 +41,15 @@ import {
   buildCreditCardInvoices,
   cardInvoiceCategory,
   cardStorageKey,
+  createRecurringCardCharge,
+  isSubscriptionCategory,
   isStoredCreditCardStore,
+  materializeDueRecurringCharges,
   type CardPurchase,
   type CreditCardAccount,
   type CreditCardInvoice,
   type CreditCardStore,
+  type RecurringCardCharge,
 } from "./credit-cards";
 import SyncConflictDialog from "./sync-conflict-dialog";
 import ThemeToggle from "./theme-toggle";
@@ -164,7 +168,7 @@ const categoryStorageKey = "finora:categories:v1";
 const transactionStorageKey = "finora:transactions:v1";
 const debtStorageKey = "finora:debts:v1";
 const goalsStorageKey = "finora:goals:v1";
-const emptyCreditCardStore: CreditCardStore = { cards: [], purchases: [], payments: [], dueDateOverrides: {} };
+const emptyCreditCardStore: CreditCardStore = { cards: [], purchases: [], payments: [], recurringCharges: [], dueDateOverrides: {} };
 
 const navigation: { label: string; href: string; icon: LucideIcon }[] = [
   { label: "Visão geral", href: "#inicio", icon: LayoutDashboard },
@@ -798,6 +802,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
       cards: creditCardData.cards,
       purchases: creditCardData.purchases,
       payments: creditCardData.payments,
+      recurringCharges: creditCardData.recurringCharges || [],
       dueDateOverrides: creditCardData.dueDateOverrides || {},
     },
   }), [transactions, debts, goals, categories, creditCardData]);
@@ -813,7 +818,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
       income: [...nextSnapshot.categories.income],
       expense: [...nextSnapshot.categories.expense],
     });
-    setCreditCardData({ ...cardStore, dueDateOverrides: { ...(cardStore.dueDateOverrides || {}) } });
+    setCreditCardData({ ...cardStore, recurringCharges: cardStore.recurringCharges || [], dueDateOverrides: { ...(cardStore.dueDateOverrides || {}) } });
     setTransactionsReady(true);
     setDebtsReady(true);
     setGoalsReady(true);
@@ -907,7 +912,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
           Object.entries(parsed.dueDateOverrides || {}).forEach(([key, value]) => {
             if (/^\d+:\d{4}-\d{2}$/.test(key) && isDateInputValue(value)) dueDateOverrides[key] = value;
           });
-          setCreditCardData({ ...parsed, dueDateOverrides });
+          setCreditCardData({ ...parsed, recurringCharges: parsed.recurringCharges || [], dueDateOverrides });
         } else announce("Os dados salvos dos cartões não puderam ser validados; a lista foi iniciada vazia.");
       }
     } catch {
@@ -925,6 +930,11 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
       announce("Não foi possível salvar os cartões neste navegador.");
     }
   }, [creditCardData, creditCardsReady, announce]);
+
+  useEffect(() => {
+    if (!creditCardsReady) return;
+    setCreditCardData((current) => materializeDueRecurringCharges(current, today));
+  }, [creditCardsReady, today, creditCardData.recurringCharges]);
 
   useEffect(() => {
     try {
@@ -1097,11 +1107,12 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
 
   function deleteCreditCard(id: number) {
     const card = creditCardData.cards.find((item) => item.id === id);
-    if (!card || !window.confirm(`Excluir o cartão “${card.name}” e todas as compras e faturas associadas? Pagamentos já lançados continuarão no histórico de despesas.`)) return;
+    if (!card || !window.confirm(`Excluir o cartão “${card.name}”, suas compras, faturas e recorrências? Pagamentos já lançados continuarão no histórico de despesas.`)) return;
     setCreditCardData((current) => ({
       cards: current.cards.filter((item) => item.id !== id),
       purchases: current.purchases.filter((purchase) => purchase.cardId !== id),
       payments: current.payments.filter((payment) => payment.cardId !== id),
+      recurringCharges: (current.recurringCharges || []).filter((charge) => charge.cardId !== id),
       dueDateOverrides: Object.keys(current.dueDateOverrides || {}).reduce<Record<string, string>>((dates, key) => {
         if (!key.startsWith(`${id}:`)) dates[key] = current.dueDateOverrides![key];
         return dates;
@@ -1110,14 +1121,61 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
     announce("Cartão e histórico de compras associados excluídos.");
   }
 
-  function saveCardPurchase(purchase: Omit<CardPurchase, "id">) {
-    setCreditCardData((current) => ({ ...current, purchases: [{ ...purchase, id: Date.now() }, ...current.purchases] }));
-    announce("Compra adicionada à fatura do cartão.");
+  function saveCardPurchase(purchase: Omit<CardPurchase, "id">, repeatMonthly: boolean) {
+    if (repeatMonthly && (!isSubscriptionCategory(purchase.category) || purchase.installments !== 1)) {
+      announce("Para repetir mensalmente, use a categoria Assinaturas e uma parcela.");
+      return;
+    }
+    setCreditCardData((current) => {
+      const purchaseId = Math.max(Date.now(), ...current.purchases.map((item) => item.id + 1));
+      const savedPurchase: CardPurchase = { ...purchase, id: purchaseId };
+      const recurringCharges = current.recurringCharges || [];
+      if (!repeatMonthly) return { ...current, purchases: [savedPurchase, ...current.purchases] };
+      const recurringId = Math.max(Date.now(), ...recurringCharges.map((charge) => charge.id + 1));
+      const recurringCharge: RecurringCardCharge = createRecurringCardCharge(savedPurchase, today, recurringId);
+      return {
+        ...current,
+        purchases: [savedPurchase, ...current.purchases],
+        recurringCharges: [recurringCharge, ...recurringCharges],
+      };
+    });
+    announce(repeatMonthly ? "Assinatura adicionada à fatura e programada para repetir mensalmente." : "Compra adicionada à fatura do cartão.");
+  }
+
+  function startExistingRecurringCharge(purchaseId: number) {
+    const purchase = creditCardData.purchases.find((item) => item.id === purchaseId);
+    if (!purchase || purchase.installments !== 1 || !isSubscriptionCategory(purchase.category)) {
+      announce("Só é possível repetir compras de assinatura em uma parcela.");
+      return;
+    }
+    const recurringCharges = creditCardData.recurringCharges || [];
+    if (recurringCharges.some((charge) => charge.sourcePurchaseId === purchaseId)) return;
+    const recurringId = Math.max(Date.now(), ...recurringCharges.map((charge) => charge.id + 1));
+    const recurringCharge: RecurringCardCharge = createRecurringCardCharge(purchase, today, recurringId);
+    setCreditCardData((current) => ({
+      ...current,
+      recurringCharges: [recurringCharge, ...(current.recurringCharges || [])],
+    }));
+    announce("Recorrência ativada. A próxima compra será incluída em uma fatura futura do cartão.");
+  }
+
+  function stopRecurringCharge(recurringChargeId: number) {
+    const charge = (creditCardData.recurringCharges || []).find((item) => item.id === recurringChargeId);
+    if (!charge || !window.confirm(`Encerrar a recorrência de “${charge.title}”? As compras e faturas já lançadas serão preservadas; nenhuma nova mensalidade será criada.`)) return;
+    setCreditCardData((current) => ({
+      ...current,
+      recurringCharges: (current.recurringCharges || []).filter((item) => item.id !== recurringChargeId),
+    }));
+    announce("Recorrência encerrada. O histórico e as faturas já lançadas foram preservados.");
   }
 
   function deleteCardPurchase(id: number) {
     const purchase = creditCardData.purchases.find((item) => item.id === id);
     if (!purchase) return;
+    if ((creditCardData.recurringCharges || []).some((charge) => charge.sourcePurchaseId === id)) {
+      announce("Encerre a recorrência antes de excluir a compra que a originou.");
+      return;
+    }
     const alreadyPaid = creditCardInvoices.some((invoice) => Boolean(invoice.paidTransactionId) && invoice.lines.some((line) => line.purchaseId === id));
     if (alreadyPaid) {
       announce("Esta compra já possui uma parcela paga e foi mantida no histórico.");
@@ -1254,7 +1312,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
                 <div className="transaction-list">{visibleTransactions.length ? (showAllTransactions ? visibleTransactions : visibleTransactions.slice(0, 5)).map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} onDelete={() => deleteTransaction(transaction.id)} />) : <p className="empty-state">Nenhuma transação encontrada.</p>}</div>
               </section>
               <DebtManager debts={debts} categories={categories} onSave={saveDebt} onDelete={deleteDebt} onPay={payInstallment} onDueDateChange={changeInstallmentDueDate} />
-              <CreditCardManager cards={creditCardData.cards} purchases={creditCardData.purchases} payments={creditCardData.payments} dueDateOverrides={creditCardData.dueDateOverrides || {}} categories={categories.expense} hidden={hidden} onSaveCard={saveCreditCard} onDeleteCard={deleteCreditCard} onSavePurchase={saveCardPurchase} onDeletePurchase={deleteCardPurchase} onChangeInvoiceDueDate={changeCardInvoiceDueDate} onPayInvoice={payCreditCardInvoice} />
+              <CreditCardManager cards={creditCardData.cards} purchases={creditCardData.purchases} payments={creditCardData.payments} recurringCharges={creditCardData.recurringCharges || []} dueDateOverrides={creditCardData.dueDateOverrides || {}} categories={categories.expense} hidden={hidden} onSaveCard={saveCreditCard} onDeleteCard={deleteCreditCard} onSavePurchase={saveCardPurchase} onStartRecurring={startExistingRecurringCharge} onStopRecurring={stopRecurringCharge} onDeletePurchase={deleteCardPurchase} onChangeInvoiceDueDate={changeCardInvoiceDueDate} onPayInvoice={payCreditCardInvoice} />
             </div>
 
             <div className="dashboard-side-column">

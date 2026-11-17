@@ -58,6 +58,8 @@ A rota `/` apresenta o dashboard Finora, com resumo do saldo, fluxo mensal, tran
 
 Na seção **Categorias**, é possível criar e excluir categorias de receitas e despesas separadamente. Receitas e despesas podem ser excluídas individualmente pela lista de transações. Na seção **Dívidas parceladas**, é possível cadastrar valor, categoria, quantidade de parcelas e vencimentos mensais; a quantidade inicia vazia, e a prévia dos vencimentos aparece após informar um número inteiro de 1 a 60. Cada data pode ser editada antes ou depois de salvar. Na seção **Cartões**, é possível cadastrar cartões e limites, lançar compras à vista ou parceladas, consultar faturas por ciclo e registrar pagamentos. O dia de vencimento e as datas individuais das faturas abertas podem ser ajustados. O limite disponível considera as parcelas de faturas ainda abertas; o saldo total só é reduzido quando a fatura é paga e lançada como despesa. Na seção **Objetivos financeiros**, é possível criar metas e adicionar aportes; aportes atualizam o objetivo, mas não são lançados como receita.
 
+Para uma assinatura no cartão, lance a compra na categoria **Assinaturas** e marque **Repetir esta compra todo mês**. Uma compra de assinatura existente em uma parcela também pode ser convertida pelo botão **Repetir mensalmente** dentro da fatura. As mensalidades futuras são registradas nas faturas do cartão quando o Finora é aberto na data de cobrança ou depois; se uma competência já foi paga, o lançamento é deslocado para a próxima fatura ainda aberta. Isso não cobra o cartão real. Em **Recorrências mensais**, use **Encerrar** para parar novas mensalidades sem apagar compras ou faturas já lançadas.
+
 ## Estrutura principal
 
 ```text

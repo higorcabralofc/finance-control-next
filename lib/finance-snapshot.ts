@@ -20,6 +20,7 @@ export type FinanceSnapshot = {
     cards: Record<string, unknown>[];
     purchases: Record<string, unknown>[];
     payments: Record<string, unknown>[];
+    recurringCharges?: Record<string, unknown>[];
     dueDateOverrides: Record<string, string>;
   };
 };
@@ -53,7 +54,7 @@ export function emptyFinanceSnapshot(): FinanceSnapshot {
       expense: [...DEFAULT_CATEGORIES.expense],
       income: [...DEFAULT_CATEGORIES.income],
     },
-    creditCards: { cards: [], purchases: [], payments: [], dueDateOverrides: {} },
+    creditCards: { cards: [], purchases: [], payments: [], recurringCharges: [], dueDateOverrides: {} },
   };
 }
 
@@ -118,7 +119,9 @@ function isPurchase(value: unknown): value is Record<string, unknown> {
     && typeof value.category === "string" && value.category.trim().length > 0 && value.category.length <= 100
     && typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount > 0
     && isDateInput(value.purchaseDate)
-    && typeof value.installments === "number" && Number.isInteger(value.installments) && value.installments >= 1 && value.installments <= 48;
+    && typeof value.installments === "number" && Number.isInteger(value.installments) && value.installments >= 1 && value.installments <= 48
+    && ((value.recurringChargeId === undefined && value.recurringChargeDate === undefined)
+      || (typeof value.recurringChargeId === "number" && Number.isFinite(value.recurringChargeId) && isDateInput(value.recurringChargeDate)));
 }
 
 function isCardPayment(value: unknown): value is Record<string, unknown> {
@@ -127,6 +130,18 @@ function isCardPayment(value: unknown): value is Record<string, unknown> {
     && typeof value.month === "string" && /^\d{4}-\d{2}$/.test(value.month)
     && typeof value.paidTransactionId === "number" && Number.isFinite(value.paidTransactionId)
     && typeof value.paidAt === "string" && value.paidAt.length <= 80;
+}
+
+function isRecurringCardCharge(value: unknown): value is Record<string, unknown> {
+  return isRecord(value)
+    && typeof value.id === "number" && Number.isFinite(value.id)
+    && typeof value.sourcePurchaseId === "number" && Number.isFinite(value.sourcePurchaseId)
+    && typeof value.cardId === "number" && Number.isFinite(value.cardId)
+    && typeof value.title === "string" && value.title.trim().length > 0 && value.title.length <= 160
+    && typeof value.category === "string" && value.category.trim().length > 0 && value.category.length <= 100
+    && typeof value.amount === "number" && Number.isFinite(value.amount) && value.amount > 0
+    && typeof value.billingDay === "number" && Number.isInteger(value.billingDay) && value.billingDay >= 1 && value.billingDay <= 31
+    && isDateInput(value.nextChargeDate);
 }
 
 function isCategoryList(value: unknown): value is string[] {
@@ -154,6 +169,7 @@ export function validateFinanceSnapshot(value: unknown): value is FinanceSnapsho
     && Array.isArray(cards.cards) && cards.cards.length <= 500 && cards.cards.every(isCard)
     && Array.isArray(cards.purchases) && cards.purchases.length <= 10_000 && cards.purchases.every(isPurchase)
     && Array.isArray(cards.payments) && cards.payments.length <= 10_000 && cards.payments.every(isCardPayment)
+    && (cards.recurringCharges === undefined || (Array.isArray(cards.recurringCharges) && cards.recurringCharges.length <= 2_000 && cards.recurringCharges.every(isRecurringCardCharge)))
     && isRecord(overrides) && Object.keys(overrides).length <= 10_000
     && Object.entries(overrides).every(([key, date]) => /^\d+:\d{4}-\d{2}$/.test(key) && isDateInput(date));
 }
@@ -186,6 +202,7 @@ export function readLocalFinanceSnapshot(): FinanceSnapshot {
         cards: Array.isArray(rawCards.cards) ? rawCards.cards.filter(isRecord) : [],
         purchases: Array.isArray(rawCards.purchases) ? rawCards.purchases.filter(isRecord) : [],
         payments: Array.isArray(rawCards.payments) ? rawCards.payments.filter(isRecord) : [],
+        recurringCharges: Array.isArray(rawCards.recurringCharges) ? rawCards.recurringCharges.filter(isRecord) : [],
         dueDateOverrides: isRecord(rawCards.dueDateOverrides)
           ? Object.fromEntries(Object.entries(rawCards.dueDateOverrides).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
           : {},
@@ -205,7 +222,7 @@ export function readLocalFinanceSnapshot(): FinanceSnapshot {
 export function hasMeaningfulFinanceData(snapshot: FinanceSnapshot): boolean {
   return snapshot.transactions.length > 0 || snapshot.debts.length > 0 || snapshot.goals.length > 0
     || snapshot.creditCards.cards.length > 0 || snapshot.creditCards.purchases.length > 0
-    || snapshot.creditCards.payments.length > 0
+    || snapshot.creditCards.payments.length > 0 || (snapshot.creditCards.recurringCharges?.length || 0) > 0
     || JSON.stringify(snapshot.categories.income) !== JSON.stringify(DEFAULT_CATEGORIES.income)
     || JSON.stringify(snapshot.categories.expense) !== JSON.stringify(DEFAULT_CATEGORIES.expense);
 }

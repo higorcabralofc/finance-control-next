@@ -240,3 +240,26 @@ html[data-theme="dark"] .debt-notification-item-overdue .debt-notification-title
 }
 html[data-theme="dark"] .debt-notification-empty > svg { color: #91d6a2; }
 html[data-theme="dark"] .debt-notification-empty strong { color: #d5e2d8; }
+
+html[data-theme="dark"] .card-recurring-panel {
+  border-color: #2b3b31;
+  background: #19251d;
+}
+html[data-theme="dark"] .card-recurring-row,
+html[data-theme="dark"] .card-recurring-option {
+  border-color: #304236;
+  background: #1b2a20;
+}
+html[data-theme="dark"] :is(.card-recurring-heading h3, .card-recurring-row strong, .card-recurring-option strong) { color: #dce8de; }
+html[data-theme="dark"] :is(.card-recurring-row small, .card-recurring-empty, .card-recurring-footnote, .card-recurring-option small) { color: #a4b2a8; }
+html[data-theme="dark"] .card-recurring-action {
+  border-color: #385540;
+  background: #213528;
+  color: #a5d7ae;
+}
+html[data-theme="dark"] .card-recurring-stop {
+  border-color: #4a3832;
+  background: #2a231f;
+  color: #efaa98;
+}
+html[data-theme="dark"] .card-recurring-generated { color: #9ed5a9 !important; }

@@ -350,6 +350,25 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .card-invoice-line > strong { color: #657268; font-size: 8px; font-weight: 650; white-space: nowrap; }
 .card-line-delete { display: grid; width: 22px; height: 22px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #a0aaa2; cursor: pointer; }
 .card-line-delete:hover { background: #fdf0ed; color: #bd6d5e; }
+.card-recurring-panel { margin-top: 12px; padding: 12px; border: 1px solid #e8eee8; border-radius: 11px; background: #fbfdfb; }
+.card-recurring-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.card-recurring-heading h3 { margin: 4px 0 0; color: #405549; font-size: 11px; font-weight: 680; }
+.card-recurring-list { display: grid; gap: 7px; margin-top: 10px; }
+.card-recurring-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 9px; border: 1px solid #edf1ed; border-radius: 8px; background: #fff; }
+.card-recurring-row > div { display: grid; min-width: 0; gap: 4px; }
+.card-recurring-row strong { overflow: hidden; color: #4d5f51; font-size: 9px; font-weight: 680; text-overflow: ellipsis; white-space: nowrap; }
+.card-recurring-row small { color: #8e9a90; font-size: 8px; line-height: 1.4; }
+.card-recurring-empty, .card-recurring-footnote { margin: 9px 0 0; color: #8f9a91; font-size: 8px; line-height: 1.5; }
+.card-recurring-stop { display: inline-flex; min-height: 29px; flex: 0 0 auto; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid #e8e9e3; border-radius: 7px; background: #fff; color: #9a6356; font: inherit; font-size: 8px; font-weight: 650; cursor: pointer; }
+.card-recurring-stop:hover { border-color: #e5c9c1; background: #fff8f6; }
+.card-recurring-action { display: inline-flex; min-height: 22px; width: fit-content; align-items: center; gap: 4px; margin-top: 3px; padding: 0 6px; border: 1px solid #e1ece2; border-radius: 6px; background: #f5faf5; color: #4e855b; font: inherit; font-size: 7px; font-weight: 650; cursor: pointer; }
+.card-recurring-action:hover { border-color: #c4dec9; background: #edf7ef; }
+.card-recurring-generated { color: #4e855b !important; }
+.card-recurring-option { display: flex; align-items: flex-start; gap: 9px; margin: 0 0 12px; padding: 10px; border: 1px solid #e4ece4; border-radius: 9px; background: #f8fbf8; cursor: pointer; }
+.card-recurring-option input { width: 16px; height: 16px; flex: 0 0 auto; margin: 1px 0 0; accent-color: #4e9060; }
+.card-recurring-option > span { display: grid; gap: 3px; }
+.card-recurring-option strong { color: #4d5f51; font-size: 9px; }
+.card-recurring-option small { color: #8a978d; font-size: 8px; line-height: 1.45; }
 .card-invoice-pay { display: inline-flex; min-height: 27px; align-items: center; gap: 5px; margin-top: 8px; padding: 0 8px; border: 1px solid #dceadd; border-radius: 7px; background: #f2f8f3; color: #477b53; font-size: 8px; font-weight: 650; cursor: pointer; }
 .card-invoice-pay:hover { border-color: #bed8c3; background: #e8f4ea; }
 .card-invoices-empty { display: flex; align-items: center; gap: 8px; padding: 13px; border: 1px dashed #e4ebe4; border-radius: 9px; color: #98a39a; font-size: 8px; }

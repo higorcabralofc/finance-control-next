@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { CalendarDays, Check, ChevronDown, CreditCard, Pencil, Plus, Receipt, Trash2, Wallet, X } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, CreditCard, Pencil, Plus, Receipt, Repeat, Trash2, Wallet, X } from "lucide-react";
 
 export type CreditCardAccount = {
   id: number;
@@ -20,6 +20,19 @@ export type CardPurchase = {
   amount: number;
   purchaseDate: string;
   installments: number;
+  recurringChargeId?: number;
+  recurringChargeDate?: string;
+};
+
+export type RecurringCardCharge = {
+  id: number;
+  sourcePurchaseId: number;
+  cardId: number;
+  title: string;
+  category: string;
+  amount: number;
+  billingDay: number;
+  nextChargeDate: string;
 };
 
 export type CardInvoicePayment = {
@@ -33,6 +46,7 @@ export type CreditCardStore = {
   cards: CreditCardAccount[];
   purchases: CardPurchase[];
   payments: CardInvoicePayment[];
+  recurringCharges?: RecurringCardCharge[];
   dueDateOverrides?: Record<string, string>;
 };
 
@@ -93,7 +107,22 @@ export function isStoredCardPurchase(value: unknown): value is CardPurchase {
     && typeof item.category === "string" && item.category.trim().length > 0
     && typeof item.amount === "number" && Number.isFinite(item.amount) && item.amount > 0
     && isDateValue(item.purchaseDate)
-    && typeof item.installments === "number" && Number.isInteger(item.installments) && item.installments >= 1 && item.installments <= 48;
+    && typeof item.installments === "number" && Number.isInteger(item.installments) && item.installments >= 1 && item.installments <= 48
+    && ((item.recurringChargeId === undefined && item.recurringChargeDate === undefined)
+      || (typeof item.recurringChargeId === "number" && Number.isFinite(item.recurringChargeId) && isDateValue(item.recurringChargeDate)));
+}
+
+export function isStoredRecurringCardCharge(value: unknown): value is RecurringCardCharge {
+  if (typeof value !== "object" || value === null) return false;
+  const item = value as Record<string, unknown>;
+  return typeof item.id === "number" && Number.isFinite(item.id)
+    && typeof item.sourcePurchaseId === "number" && Number.isFinite(item.sourcePurchaseId)
+    && typeof item.cardId === "number" && Number.isFinite(item.cardId)
+    && typeof item.title === "string" && item.title.trim().length > 0
+    && typeof item.category === "string" && item.category.trim().length > 0
+    && typeof item.amount === "number" && Number.isFinite(item.amount) && item.amount > 0
+    && typeof item.billingDay === "number" && Number.isInteger(item.billingDay) && item.billingDay >= 1 && item.billingDay <= 31
+    && isDateValue(item.nextChargeDate);
 }
 
 export function isStoredCardInvoicePayment(value: unknown): value is CardInvoicePayment {
@@ -110,7 +139,8 @@ export function isStoredCreditCardStore(value: unknown): value is CreditCardStor
   const item = value as Record<string, unknown>;
   return Array.isArray(item.cards) && item.cards.every(isStoredCreditCard)
     && Array.isArray(item.purchases) && item.purchases.every(isStoredCardPurchase)
-    && Array.isArray(item.payments) && item.payments.every(isStoredCardInvoicePayment);
+    && Array.isArray(item.payments) && item.payments.every(isStoredCardInvoicePayment)
+    && (item.recurringCharges === undefined || (Array.isArray(item.recurringCharges) && item.recurringCharges.every(isStoredRecurringCardCharge)));
 }
 
 function monthKey(year: number, month: number) {
@@ -132,7 +162,6 @@ function firstInvoiceMonth(purchaseDate: string, closingDay: number) {
 }
 
 function invoiceDueDate(invoiceMonth: string, closingDay: number, dueDay: number) {
-  const [year, month] = invoiceMonth.split("-").map(Number);
   const dueMonth = addMonth(invoiceMonth, dueDay <= closingDay ? 1 : 0);
   const [dueYear, dueMonthNumber] = dueMonth.split("-").map(Number);
   const finalDay = new Date(dueYear, dueMonthNumber, 0).getDate();
@@ -199,6 +228,117 @@ function displayMonth(value: string) {
 function todayValue() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+export function isSubscriptionCategory(category: string) {
+  return category.trim().toLocaleLowerCase("pt-BR").includes("assinatur");
+}
+
+export function nextMonthlyChargeDate(billingDay: number, afterDate: string) {
+  const [year, month, anchorDay] = afterDate.split("-").map(Number);
+  let monthIndex = year * 12 + month - 1;
+  let candidate = "";
+  do {
+    const targetYear = Math.floor(monthIndex / 12);
+    const targetMonth = monthIndex % 12;
+    const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+    candidate = `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(Math.min(billingDay, lastDay)).padStart(2, "0")}`;
+    monthIndex += 1;
+  } while (candidate <= `${year}-${String(month).padStart(2, "0")}-${String(anchorDay).padStart(2, "0")}`);
+  return candidate;
+}
+
+function followingMonthlyChargeDate(date: string, billingDay: number) {
+  const [year, month] = date.split("-").map(Number);
+  const monthIndex = year * 12 + month;
+  const targetYear = Math.floor(monthIndex / 12);
+  const targetMonth = monthIndex % 12;
+  const lastDay = new Date(targetYear, targetMonth + 1, 0).getDate();
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, "0")}-${String(Math.min(billingDay, lastDay)).padStart(2, "0")}`;
+}
+
+export function createRecurringCardCharge(purchase: CardPurchase, today: string, id: number): RecurringCardCharge {
+  const billingDay = Number(purchase.purchaseDate.slice(8));
+  const anchorDate = purchase.purchaseDate > today ? purchase.purchaseDate : today;
+  return {
+    id,
+    sourcePurchaseId: purchase.id,
+    cardId: purchase.cardId,
+    title: purchase.title,
+    category: purchase.category,
+    amount: purchase.amount,
+    billingDay,
+    nextChargeDate: nextMonthlyChargeDate(billingDay, anchorDate),
+  };
+}
+
+function recurringOccurrenceId(recurringChargeId: number, date: string) {
+  const source = `${recurringChargeId}:${date}`;
+  let firstHash = 2166136261;
+  let secondHash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index += 1) {
+    const code = source.charCodeAt(index);
+    firstHash = Math.imul(firstHash ^ code, 16777619) >>> 0;
+    secondHash = Math.imul(secondHash ^ code, 2246822519) >>> 0;
+  }
+  const stableHash = (firstHash & 0x1fffff) * 4294967296 + secondHash;
+  return -Math.max(1, stableHash);
+}
+
+export function materializeDueRecurringCharges(store: CreditCardStore, today: string): CreditCardStore {
+  const recurringCharges = store.recurringCharges || [];
+  if (!isDateValue(today) || recurringCharges.length === 0) return store;
+
+  const occurrenceKeys = new Set(store.purchases
+    .filter((purchase) => purchase.recurringChargeId !== undefined && purchase.recurringChargeDate)
+    .map((purchase) => `${purchase.recurringChargeId}:${purchase.recurringChargeDate}`));
+  const paidInvoiceKeys = new Set(store.payments.map((payment) => `${payment.cardId}:${payment.month}`));
+  const cardsById = new Map(store.cards.map((card) => [card.id, card]));
+  const usedIds = new Set(store.purchases.map((purchase) => purchase.id));
+  let generationBudget = 1000;
+  let changed = false;
+  const newPurchases: CardPurchase[] = [];
+
+  const updatedCharges = recurringCharges.map((charge) => {
+    const card = cardsById.get(charge.cardId);
+    if (!card) return charge;
+    let nextChargeDate = charge.nextChargeDate;
+    while (nextChargeDate <= today && generationBudget > 0) {
+      const occurrenceKey = `${charge.id}:${nextChargeDate}`;
+      if (!occurrenceKeys.has(occurrenceKey)) {
+        let purchaseDate = nextChargeDate;
+        let invoiceMonth = firstInvoiceMonth(nextChargeDate, card.closingDay);
+        let offset = 0;
+        while (paidInvoiceKeys.has(`${card.id}:${invoiceMonth}`)) {
+          invoiceMonth = addMonth(invoiceMonth, 1);
+          offset += 1;
+        }
+        if (offset > 0) purchaseDate = `${invoiceMonth}-01`;
+        let purchaseId = recurringOccurrenceId(charge.id, nextChargeDate);
+        while (usedIds.has(purchaseId)) purchaseId -= 1;
+        newPurchases.push({
+          id: purchaseId,
+          cardId: charge.cardId,
+          title: charge.title,
+          category: charge.category,
+          amount: charge.amount,
+          purchaseDate,
+          installments: 1,
+          recurringChargeId: charge.id,
+          recurringChargeDate: nextChargeDate,
+        });
+        usedIds.add(purchaseId);
+        occurrenceKeys.add(occurrenceKey);
+      }
+      nextChargeDate = followingMonthlyChargeDate(nextChargeDate, charge.billingDay);
+      generationBudget -= 1;
+    }
+    if (nextChargeDate !== charge.nextChargeDate) changed = true;
+    return nextChargeDate === charge.nextChargeDate ? charge : { ...charge, nextChargeDate };
+  });
+
+  if (!changed) return store;
+  return { ...store, purchases: [...store.purchases, ...newPurchases], recurringCharges: updatedCharges };
 }
 
 function CreditCardModal({
@@ -272,7 +412,7 @@ function CardPurchaseModal({
   categories: string[];
   initialCardId: number;
   onClose: () => void;
-  onSave: (purchase: Omit<CardPurchase, "id">) => void;
+  onSave: (purchase: Omit<CardPurchase, "id">, repeatMonthly: boolean) => void;
 }) {
   const [cardIdText, setCardIdText] = useState(String(initialCardId));
   const [title, setTitle] = useState("");
@@ -280,18 +420,20 @@ function CardPurchaseModal({
   const [amountText, setAmountText] = useState("");
   const [purchaseDate, setPurchaseDate] = useState(todayValue);
   const [installmentsText, setInstallmentsText] = useState("1");
+  const [repeatMonthly, setRepeatMonthly] = useState(false);
   const [error, setError] = useState("");
+  const canRepeatMonthly = isSubscriptionCategory(category);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const amount = parseMoney(amountText);
     const installments = Number(installmentsText);
     const cardId = Number(cardIdText);
-    if (!cards.some((card) => card.id === cardId) || !title.trim() || !category || !Number.isFinite(amount) || amount <= 0 || !isDateValue(purchaseDate) || !Number.isInteger(installments) || installments < 1 || installments > 48) {
+    if (!cards.some((card) => card.id === cardId) || !title.trim() || !category || !Number.isFinite(amount) || amount <= 0 || !isDateValue(purchaseDate) || !Number.isInteger(installments) || installments < 1 || installments > 48 || (repeatMonthly && installments !== 1)) {
       setError("Confira a descrição, o cartão, o valor, a data e o número de parcelas.");
       return;
     }
-    onSave({ cardId, title: title.trim(), category, amount: Math.round(amount * 100) / 100, purchaseDate, installments });
+    onSave({ cardId, title: title.trim(), category, amount: Math.round(amount * 100) / 100, purchaseDate, installments }, repeatMonthly);
   }
 
   return (
@@ -303,13 +445,14 @@ function CardPurchaseModal({
           <label className="form-label">Descrição da compra<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: mercado, passagem" maxLength={80} autoFocus required /></label>
           <div className="form-row">
             <label className="form-label">Valor total (R$)<input value={amountText} onChange={(event) => setAmountText(event.target.value)} placeholder="0,00" inputMode="decimal" required /></label>
-            <label className="form-label">Categoria<select value={category} onChange={(event) => setCategory(event.target.value)} required>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
+            <label className="form-label">Categoria<select value={category} onChange={(event) => { const nextCategory = event.target.value; setCategory(nextCategory); if (!isSubscriptionCategory(nextCategory)) setRepeatMonthly(false); }}>{categories.map((item) => <option key={item} value={item}>{item}</option>)}</select></label>
           </div>
           <div className="form-row">
             <label className="form-label">Data da compra<input type="date" value={purchaseDate} onChange={(event) => setPurchaseDate(event.target.value)} required /></label>
-            <label className="form-label">Parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={installmentsText} onChange={(event) => setInstallmentsText(event.target.value.replace(/\D/g, "").slice(0, 2))} onFocus={(event) => event.currentTarget.select()} required /></label>
+            <label className="form-label">Parcelas<input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} value={repeatMonthly ? "1" : installmentsText} onChange={(event) => setInstallmentsText(event.target.value.replace(/\D/g, "").slice(0, 2))} onFocus={(event) => event.currentTarget.select()} disabled={repeatMonthly} required /></label>
           </div>
-          <p className="card-form-note"><CalendarDays size={13} /> A primeira parcela entra na fatura conforme o fechamento do cartão; as próximas são distribuídas nos meses seguintes.</p>
+          {canRepeatMonthly && <label className="card-recurring-option"><input type="checkbox" checked={repeatMonthly} onChange={(event) => { setRepeatMonthly(event.target.checked); if (event.target.checked) setInstallmentsText("1"); }} /><span><strong>Repetir esta compra todo mês</strong><small>Cria uma nova compra nas próximas faturas. Não realiza a cobrança real no cartão.</small></span></label>}
+          <p className="card-form-note"><CalendarDays size={13} /> {repeatMonthly ? "A compra inicial entra na fatura conforme o fechamento do cartão; as próximas cobranças são lançadas quando o Finora for aberto na data prevista ou depois." : "A primeira parcela entra na fatura conforme o fechamento do cartão; as próximas são distribuídas nos meses seguintes."}</p>
           {error && <p className="form-error" role="alert">{error}</p>}
           <div className="modal-actions"><button type="button" className="button-quiet" onClick={onClose}>Cancelar</button><button type="submit" className="button-primary"><Check size={16} /> Salvar compra</button></div>
         </form>
@@ -322,12 +465,15 @@ export function CreditCardManager({
   cards,
   purchases,
   payments,
+  recurringCharges,
   dueDateOverrides,
   categories,
   hidden,
   onSaveCard,
   onDeleteCard,
   onSavePurchase,
+  onStartRecurring,
+  onStopRecurring,
   onDeletePurchase,
   onChangeInvoiceDueDate,
   onPayInvoice,
@@ -335,12 +481,15 @@ export function CreditCardManager({
   cards: CreditCardAccount[];
   purchases: CardPurchase[];
   payments: CardInvoicePayment[];
+  recurringCharges: RecurringCardCharge[];
   dueDateOverrides: Record<string, string>;
   categories: string[];
   hidden: boolean;
   onSaveCard: (card: Omit<CreditCardAccount, "id"> & { id?: number }) => void;
   onDeleteCard: (id: number) => void;
-  onSavePurchase: (purchase: Omit<CardPurchase, "id">) => void;
+  onSavePurchase: (purchase: Omit<CardPurchase, "id">, repeatMonthly: boolean) => void;
+  onStartRecurring: (purchaseId: number) => void;
+  onStopRecurring: (recurringChargeId: number) => void;
   onDeletePurchase: (id: number) => void;
   onChangeInvoiceDueDate: (invoiceKey: string, dueDate: string) => void;
   onPayInvoice: (invoice: CreditCardInvoice) => void;
@@ -352,7 +501,8 @@ export function CreditCardManager({
   const today = todayValue();
 
   function isPurchaseLocked(purchaseId: number) {
-    return invoices.some((invoice) => Boolean(invoice.paidTransactionId) && invoice.lines.some((line) => line.purchaseId === purchaseId));
+    return recurringCharges.some((charge) => charge.sourcePurchaseId === purchaseId)
+      || invoices.some((invoice) => Boolean(invoice.paidTransactionId) && invoice.lines.some((line) => line.purchaseId === purchaseId));
   }
 
   return (
@@ -405,6 +555,20 @@ export function CreditCardManager({
         </div>
       )}
 
+      <section className="card-recurring-panel" aria-labelledby="card-recurring-title">
+        <div className="card-recurring-heading"><div><span className="eyebrow">ASSINATURAS</span><h3 id="card-recurring-title">Recorrências mensais</h3></div><span className="card-invoice-count">{recurringCharges.length}</span></div>
+        {recurringCharges.length === 0 ? <p className="card-recurring-empty">Ao lançar uma compra na categoria Assinaturas, marque “Repetir esta compra todo mês”. Você também pode ativar uma compra de assinatura de uma parcela já cadastrada.</p> : <div className="card-recurring-list">
+          {recurringCharges.map((charge) => {
+            const card = cards.find((item) => item.id === charge.cardId);
+            return <article className="card-recurring-row" key={charge.id}>
+              <div><strong>{charge.title}</strong><small>{card?.name || "Cartão removido"} · {hidden ? "••••" : `${money(charge.amount)} / mês`} · próxima cobrança {displayDate(charge.nextChargeDate)}</small></div>
+              <button type="button" className="card-recurring-stop" onClick={() => onStopRecurring(charge.id)} aria-label={`Encerrar recorrência de ${charge.title}`} title="Parar as próximas cobranças">Encerrar</button>
+            </article>;
+          })}
+        </div>}
+        <p className="card-recurring-footnote">As mensalidades entram nas faturas quando o Finora é aberto na data prevista ou depois; se o app ficou fechado, as cobranças pendentes são recuperadas no próximo acesso. Isso registra compras no Finora, mas não cobra o cartão real.</p>
+      </section>
+
       <div className="card-invoices-section">
         <div className="card-invoices-heading"><div><span className="eyebrow">CICLOS DE COBRANÇA</span><h3>Faturas</h3></div><div className="card-invoices-controls"><span className="card-invoice-count">{invoices.length}</span>{invoices.length > 0 && <button type="button" className="card-invoices-toggle" aria-expanded={!invoicesCollapsed} aria-controls="card-invoice-list" onClick={() => setInvoicesCollapsed((collapsed) => !collapsed)}><ChevronDown size={13} aria-hidden="true" /><span>{invoicesCollapsed ? "Mostrar faturas" : "Recolher faturas"}</span></button>}</div></div>
         {invoices.length === 0 ? (
@@ -427,13 +591,21 @@ export function CreditCardManager({
                     <div className="card-invoice-content">
                       <div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" title="Escolha a data no calendário; ela será salva automaticamente" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div>
                       <div className="card-invoice-lines">
-                        {invoice.lines.map((line, index) => (
-                          <div className="card-invoice-line" key={`${invoice.key}-${line.purchaseId}-${line.installmentNumber}-${index}`}>
-                            <div><strong>{line.title}</strong><small>{line.category} · parcela {line.installmentNumber}/{line.installmentCount}</small></div>
+                        {invoice.lines.map((line, index) => {
+                          const purchase = purchases.find((item) => item.id === line.purchaseId);
+                          const isRecurringSource = recurringCharges.some((charge) => charge.sourcePurchaseId === line.purchaseId);
+                          const canConvert = Boolean(purchase && purchase.installments === 1 && !purchase.recurringChargeId
+                            && isSubscriptionCategory(purchase.category) && !isRecurringSource);
+                          return <div className="card-invoice-line" key={`${invoice.key}-${line.purchaseId}-${line.installmentNumber}-${index}`}>
+                            <div><strong>{line.title}</strong><small>{line.category} · parcela {line.installmentNumber}/{line.installmentCount}</small>
+                              {canConvert && <button type="button" className="card-recurring-action" onClick={() => onStartRecurring(line.purchaseId)}><Repeat size={12} /> Repetir mensalmente</button>}
+                              {purchase?.recurringChargeId !== undefined && <small className="card-recurring-generated">Mensalidade recorrente</small>}
+                              {isRecurringSource && <small className="card-recurring-generated">Recorrência ativa</small>}
+                            </div>
                             <strong>{hidden ? "••••" : money(line.amount)}</strong>
                             {!lockedPurchaseIds.has(line.purchaseId) && <button type="button" className="card-line-delete" aria-label={`Excluir compra ${line.title}`} title="Excluir compra de todas as faturas" onClick={() => onDeletePurchase(line.purchaseId)}><Trash2 size={13} /></button>}
-                          </div>
-                        ))}
+                          </div>;
+                        })}
                       </div>
                       {!invoice.paidTransactionId && <button type="button" className="card-invoice-pay" onClick={() => onPayInvoice(invoice)}><Check size={13} /> Registrar pagamento da fatura</button>}
                     </div>
@@ -444,10 +616,10 @@ export function CreditCardManager({
           </div>
         )}
       </div>
-      <p className="card-manager-footnote"><Wallet size={12} /> Ajuste a data diretamente em cada fatura aberta; o dia padrão do cartão continua valendo para novos ciclos. Compras e faturas são salvas neste navegador. Ao pagar uma fatura, o pagamento entra nas despesas e a fatura deixa de consumir o limite; não informe número completo nem código de segurança.</p>
+      <p className="card-manager-footnote"><Wallet size={12} /> Ajuste a data diretamente em cada fatura aberta; o dia padrão do cartão continua valendo para novos ciclos. Compras, recorrências e faturas são sincronizadas com sua conta. Ao pagar uma fatura, o pagamento entra nas despesas e a fatura deixa de consumir o limite; não informe número completo nem código de segurança.</p>
 
       {cardModal && <CreditCardModal key={cardModal === "new" ? "new-card" : `card-${cardModal.id}`} card={cardModal === "new" ? undefined : cardModal} onClose={() => setCardModal(null)} onSave={(card) => { onSaveCard(card); setCardModal(null); }} />}
-      {purchaseCardId !== null && <CardPurchaseModal cards={cards} categories={categories} initialCardId={purchaseCardId} onClose={() => setPurchaseCardId(null)} onSave={(purchase) => { onSavePurchase(purchase); setPurchaseCardId(null); }} />}
+      {purchaseCardId !== null && <CardPurchaseModal cards={cards} categories={categories} initialCardId={purchaseCardId} onClose={() => setPurchaseCardId(null)} onSave={(purchase, repeatMonthly) => { onSavePurchase(purchase, repeatMonthly); setPurchaseCardId(null); }} />}
     </section>
   );
 }
