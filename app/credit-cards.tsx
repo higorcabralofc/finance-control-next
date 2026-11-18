@@ -71,6 +71,36 @@ export type CreditCardInvoice = {
   paidAt?: string;
 };
 
+export type InvoicePaymentUndoValidation =
+  | { ok: true; transactionId: number }
+  | { ok: false; reason: "invoice-not-paid" | "payment-link-ambiguous" | "transaction-not-found" | "transaction-id-ambiguous" | "transaction-not-expense" | "transaction-category-mismatch" | "transaction-linked-to-installment" };
+
+export function checkSafeInvoicePaymentUndo(
+  invoice: CreditCardInvoice,
+  payments: readonly CardInvoicePayment[],
+  transactions: readonly { id: number; kind: string; category: string }[],
+  linkedDebtPaymentIds: readonly number[] = [],
+): InvoicePaymentUndoValidation {
+  const transactionId = invoice.paidTransactionId;
+  if (typeof transactionId !== "number" || !Number.isFinite(transactionId)) return { ok: false, reason: "invoice-not-paid" };
+  if (linkedDebtPaymentIds.includes(transactionId)) return { ok: false, reason: "transaction-linked-to-installment" };
+
+  // O ID do pagamento é o vínculo estável: a soma atual pode crescer se houver compras lançadas após a quitação.
+  const invoicePayments = payments.filter((payment) => payment.cardId === invoice.cardId && payment.month === invoice.month);
+  const linkedPayments = payments.filter((payment) => payment.paidTransactionId === transactionId);
+  if (invoicePayments.length !== 1 || invoicePayments[0].paidTransactionId !== transactionId
+    || linkedPayments.length !== 1 || linkedPayments[0].cardId !== invoice.cardId || linkedPayments[0].month !== invoice.month) {
+    return { ok: false, reason: "payment-link-ambiguous" };
+  }
+
+  const linkedTransactions = transactions.filter((transaction) => transaction.id === transactionId);
+  if (linkedTransactions.length === 0) return { ok: false, reason: "transaction-not-found" };
+  if (linkedTransactions.length > 1) return { ok: false, reason: "transaction-id-ambiguous" };
+  if (linkedTransactions[0].kind !== "expense") return { ok: false, reason: "transaction-not-expense" };
+  if (linkedTransactions[0].category !== cardInvoiceCategory) return { ok: false, reason: "transaction-category-mismatch" };
+  return { ok: true, transactionId };
+}
+
 export const cardStorageKey = "finora:credit-cards:v1";
 export const cardInvoiceCategory = "Faturas de cartão";
 
@@ -477,6 +507,7 @@ export function CreditCardManager({
   onDeletePurchase,
   onChangeInvoiceDueDate,
   onPayInvoice,
+  onUndoInvoicePayment,
 }: {
   cards: CreditCardAccount[];
   purchases: CardPurchase[];
@@ -493,6 +524,7 @@ export function CreditCardManager({
   onDeletePurchase: (id: number) => void;
   onChangeInvoiceDueDate: (invoiceKey: string, dueDate: string) => void;
   onPayInvoice: (invoice: CreditCardInvoice) => void;
+  onUndoInvoicePayment: (invoice: CreditCardInvoice) => void;
 }) {
   const [cardModal, setCardModal] = useState<CreditCardAccount | "new" | null>(null);
   const [purchaseCardId, setPurchaseCardId] = useState<number | null>(null);
@@ -503,7 +535,7 @@ export function CreditCardManager({
 
   function isPurchaseLocked(purchaseId: number) {
     return recurringCharges.some((charge) => charge.sourcePurchaseId === purchaseId)
-      || invoices.some((invoice) => Boolean(invoice.paidTransactionId) && invoice.lines.some((line) => line.purchaseId === purchaseId));
+      || invoices.some((invoice) => invoice.paidTransactionId !== undefined && invoice.lines.some((line) => line.purchaseId === purchaseId));
   }
 
   return (
@@ -519,9 +551,9 @@ export function CreditCardManager({
         <div className="credit-card-list">
           {cards.map((card) => {
             const cardInvoices = invoices.filter((invoice) => invoice.cardId === card.id);
-            const used = cardInvoices.reduce((sum, invoice) => sum + (invoice.paidTransactionId ? 0 : invoice.amount), 0);
+            const used = cardInvoices.reduce((sum, invoice) => sum + (invoice.paidTransactionId === undefined ? invoice.amount : 0), 0);
             const available = card.creditLimit - used;
-            const nextInvoice = cardInvoices.find((invoice) => !invoice.paidTransactionId);
+            const nextInvoice = cardInvoices.find((invoice) => invoice.paidTransactionId === undefined);
             return (
               <article className="credit-card-item" key={card.id}>
                 <details className="credit-card-disclosure">
@@ -585,18 +617,19 @@ export function CreditCardManager({
             {invoices.map((invoice) => {
               const card = cards.find((item) => item.id === invoice.cardId);
               if (!card) return null;
-              const overdue = !invoice.paidTransactionId && invoice.dueDate < today;
-              const lockedPurchaseIds = new Set(invoice.lines.filter((line) => isPurchaseLocked(line.purchaseId)).map((line) => line.purchaseId));
+              const isPaid = invoice.paidTransactionId !== undefined;
+              const overdue = !isPaid && invoice.dueDate < today;
+              const lockedPurchaseIds = new Set(invoice.lines.filter((line) => isPaid && isPurchaseLocked(line.purchaseId)).map((line) => line.purchaseId));
               return (
-                <article className={`card-invoice ${invoice.paidTransactionId ? "card-invoice-paid" : ""}`} key={invoice.key}>
+                <article className={`card-invoice ${isPaid ? "card-invoice-paid" : ""}`} key={invoice.key}>
                   <details className="card-invoice-disclosure">
                     <summary className="card-invoice-summary">
                       <span className="card-invoice-icon"><Receipt size={15} /></span>
                       <span className="card-invoice-summary-main"><strong>{card.name} · fatura de <span className="invoice-month-label">{displayMonth(invoice.month)}</span></strong><small>Vencimento {displayDate(invoice.dueDate)}</small></span>
-                      <span className="card-invoice-total"><strong>{hidden ? "••••••" : money(invoice.amount)}</strong><span className={invoice.paidTransactionId ? "invoice-status-paid" : overdue ? "invoice-status-overdue" : "invoice-status-open"}>{invoice.paidTransactionId ? "Paga" : overdue ? "Vencida" : "Em aberto"}</span></span>
+                      <span className="card-invoice-total"><strong>{hidden ? "••••••" : money(invoice.amount)}</strong><span className={isPaid ? "invoice-status-paid" : overdue ? "invoice-status-overdue" : "invoice-status-open"}>{isPaid ? "Paga" : overdue ? "Vencida" : "Em aberto"}</span></span>
                     </summary>
                     <div className="card-invoice-content">
-                      <div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{invoice.paidTransactionId ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" title="Escolha a data no calendário; ela será salva automaticamente" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div>
+                      <div className="card-invoice-due"><label htmlFor={`invoice-due-${invoice.key}`}>Vencimento</label>{isPaid ? <span>{displayDate(invoice.dueDate)}</span> : <input id={`invoice-due-${invoice.key}`} className="card-invoice-date-input" type="date" title="Escolha a data no calendário; ela será salva automaticamente" value={invoice.dueDate} onChange={(event) => onChangeInvoiceDueDate(invoice.key, event.target.value)} />}{invoice.paidAt && <span>· paga em {displayDate(invoice.paidAt)}</span>}</div>
                       <div className="card-invoice-lines">
                         {invoice.lines.map((line, index) => {
                           const purchase = purchases.find((item) => item.id === line.purchaseId);
@@ -614,7 +647,11 @@ export function CreditCardManager({
                           </div>;
                         })}
                       </div>
-                      {!invoice.paidTransactionId && <button type="button" className="card-invoice-pay" onClick={() => onPayInvoice(invoice)}><Check size={13} /> Registrar pagamento da fatura</button>}
+                      {isPaid ? (
+                        <button type="button" className="card-invoice-undo" onClick={() => onUndoInvoicePayment(invoice)}>Desfazer pagamento e reabrir fatura</button>
+                      ) : (
+                        <button type="button" className="card-invoice-pay" onClick={() => onPayInvoice(invoice)}><Check size={13} /> Registrar pagamento da fatura</button>
+                      )}
                     </div>
                   </details>
                 </article>

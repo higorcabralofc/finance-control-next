@@ -41,6 +41,7 @@ import {
   buildCreditCardInvoices,
   cardInvoiceCategory,
   cardStorageKey,
+  checkSafeInvoicePaymentUndo,
   createRecurringCardCharge,
   isSubscriptionCategory,
   isStoredCreditCardStore,
@@ -629,7 +630,7 @@ function DebtManager({
               {debt.installments.map((installment) => <div className="debt-installment-row" key={installment.number}>
                 <span className="debt-installment-label">Parcela {installment.number}/{debt.installments.length}</span>
                 <label className="debt-date-label"><span className="sr-only">Vencimento da parcela {installment.number}</span><input type="date" value={installment.dueDate} onChange={(event) => onDueDateChange(debt.id, installment.number, event.target.value)} aria-label={`Vencimento da parcela ${installment.number} de ${debt.title}`} /></label>
-                <div className="debt-installment-value"><strong>{formatCurrency(installment.amount)}</strong>{installment.paidTransactionId ? <span className="debt-paid-status"><Check size={11} /> Pagamento lançado</span> : <button type="button" className="installment-pay-button" disabled={installment.amount <= 0} onClick={() => onPay(debt.id, installment.number)}><Check size={11} /> Registrar pagamento</button>}</div>
+                <div className="debt-installment-value"><strong>{formatCurrency(installment.amount)}</strong>{installment.paidTransactionId !== undefined ? <span className="debt-paid-status"><Check size={11} /> Pagamento lançado</span> : <button type="button" className="installment-pay-button" disabled={installment.amount <= 0} onClick={() => onPay(debt.id, installment.number)}><Check size={11} /> Registrar pagamento</button>}</div>
               </div>)}
             </div>
           </details>
@@ -768,7 +769,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
 
   const financeReady = transactionsReady && debtsReady && creditCardsReady && goalsReady && categoriesReady;
   const debtDueAlerts = useMemo<DebtDueAlert[]>(() => debts.flatMap((debt) => debt.installments
-    .filter((installment) => !installment.paidTransactionId && installment.amount > 0
+    .filter((installment) => installment.paidTransactionId === undefined && installment.amount > 0
       && isDateInputValue(installment.dueDate) && installment.dueDate <= today)
     .map((installment) => ({
       id: `${debt.id}:${installment.number}:${installment.dueDate}`,
@@ -994,11 +995,11 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
     totals[transaction.kind] += transaction.amount;
     return totals;
   }, { income: 0, expense: 0 }), [transactions]);
-  const outstandingDebt = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId ? 0 : installment.amount), 0), 0);
+  const outstandingDebt = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId !== undefined ? 0 : installment.amount), 0), 0);
   const creditCardInvoices = useMemo(() => buildCreditCardInvoices(creditCardData.cards, creditCardData.purchases, creditCardData.payments), [creditCardData]);
-  const outstandingCardInvoices = creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId ? 0 : invoice.amount), 0);
-  const linkedPaymentCents = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId ? Math.round(installment.amount * 100) : 0), 0), 0)
-    + creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId ? Math.round(invoice.amount * 100) : 0), 0);
+  const outstandingCardInvoices = creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId === undefined ? invoice.amount : 0), 0);
+  const linkedPaymentCents = debts.reduce((total, debt) => total + debt.installments.reduce((subtotal, installment) => subtotal + (installment.paidTransactionId !== undefined ? Math.round(installment.amount * 100) : 0), 0), 0)
+    + creditCardInvoices.reduce((total, invoice) => total + (invoice.paidTransactionId !== undefined ? Math.round(invoice.amount * 100) : 0), 0);
   const linkedPaymentExpenses = linkedPaymentCents / 100;
   const totalBalance = transactionTotals.income - transactionTotals.expense;
   const expensesByCategory = useMemo(() => transactions.reduce<Record<string, number>>((totals, transaction) => {
@@ -1027,9 +1028,40 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
   }
 
   function deleteTransaction(id: number) {
-    const transaction = transactions.find((item) => item.id === id);
-    const linkedInstallment = debts.some((debt) => debt.installments.some((installment) => installment.paidTransactionId === id));
-    const linkedCardInvoice = creditCardData.payments.some((payment) => payment.paidTransactionId === id);
+    const matchingTransactions = transactions.filter((item) => item.id === id);
+    const linkedInstallments = debts.flatMap((debt) => debt.installments.filter((installment) => installment.paidTransactionId === id));
+    const linkedCardPayments = creditCardData.payments.filter((payment) => payment.paidTransactionId === id);
+    if (matchingTransactions.length === 0 && linkedInstallments.length === 0 && linkedCardPayments.length === 0) return;
+    if (matchingTransactions.length !== 1) {
+      announce("Não foi possível excluir com segurança: o identificador da transação está ausente ou duplicado. Nada foi alterado.");
+      return;
+    }
+    if (linkedInstallments.length > 1 || linkedCardPayments.length > 1 || (linkedInstallments.length > 0 && linkedCardPayments.length > 0)) {
+      announce("Não foi possível excluir com segurança: há mais de um vínculo de pagamento. Nada foi alterado.");
+      return;
+    }
+    const transaction = matchingTransactions[0];
+    const linkedCardPayment = linkedCardPayments[0];
+    if ((linkedInstallments.length > 0 || linkedCardPayment) && transaction.kind !== "expense") {
+      announce("Não foi possível excluir com segurança: o lançamento vinculado não é uma despesa. Nada foi alterado.");
+      return;
+    }
+    if (linkedCardPayment) {
+      const matchingInvoices = creditCardInvoices.filter((invoice) => invoice.cardId === linkedCardPayment.cardId && invoice.month === linkedCardPayment.month);
+      const validation = matchingInvoices.length === 1
+        ? checkSafeInvoicePaymentUndo(matchingInvoices[0], creditCardData.payments, transactions)
+        : { ok: false as const, reason: "payment-link-ambiguous" as const };
+      if (!validation.ok) {
+        announce("Não foi possível excluir com segurança: o vínculo entre a fatura e o pagamento está ausente ou inconsistente. Nada foi alterado.");
+        return;
+      }
+    }
+    if (transaction.category === cardInvoiceCategory && !linkedCardPayment) {
+      announce("Esta despesa parece ser um pagamento de fatura, mas não tem vínculo válido. Nada foi alterado.");
+      return;
+    }
+    const linkedInstallment = linkedInstallments.length === 1;
+    const linkedCardInvoice = Boolean(linkedCardPayment);
     if (!transaction || !window.confirm(`Excluir a transação “${transaction.title}”? O saldo será atualizado.${linkedInstallment ? " A parcela correspondente voltará a ficar em aberto." : ""}${linkedCardInvoice ? " A fatura do cartão correspondente voltará a ficar em aberto." : ""}`)) return;
     setTransactions((current) => current.filter((item) => item.id !== id));
     if (linkedInstallment) {
@@ -1038,10 +1070,21 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
         installments: debt.installments.map((installment) => installment.paidTransactionId === id ? { ...installment, paidTransactionId: undefined } : installment),
       })));
     }
-    if (linkedCardInvoice) {
-      setCreditCardData((current) => ({ ...current, payments: current.payments.filter((payment) => payment.paidTransactionId !== id) }));
+    if (linkedCardPayment) {
+      setCreditCardData((current) => ({
+        ...current,
+        payments: current.payments.filter((payment) => !(
+          payment.cardId === linkedCardPayment.cardId
+          && payment.month === linkedCardPayment.month
+          && payment.paidTransactionId === id
+        )),
+      }));
     }
-    announce("Transação excluída e saldo atualizado.");
+    announce(linkedCardInvoice
+      ? "Pagamento da fatura desfeito; fatura reaberta e saldo atualizado."
+      : linkedInstallment
+        ? "Pagamento excluído; parcela reaberta e saldo atualizado."
+        : "Transação excluída e saldo atualizado.");
   }
 
   function saveDebt(debt: Omit<InstallmentDebt, "id">) {
@@ -1059,7 +1102,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
   function payInstallment(debtId: number, installmentNumber: number) {
     const debt = debts.find((item) => item.id === debtId);
     const installment = debt?.installments.find((item) => item.number === installmentNumber);
-    if (!debt || !installment || installment.paidTransactionId || installment.amount <= 0) return;
+    if (!debt || !installment || installment.paidTransactionId !== undefined || installment.amount <= 0) return;
     if (!window.confirm(`Registrar o pagamento da parcela ${installment.number}/${debt.installments.length} de ${debt.title} como despesa de ${formatCurrency(installment.amount)}?`)) return;
     const transactionId = Date.now();
     setTransactions((current) => [{
@@ -1089,10 +1132,10 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
     const id = card.id ?? Date.now();
     const previousCard = creditCardData.cards.find((item) => item.id === id);
     const billingCycleChanged = Boolean(previousCard && (previousCard.closingDay !== card.closingDay || previousCard.dueDay !== card.dueDay));
-    const openInvoiceKeys = new Set(creditCardInvoices.filter((invoice) => invoice.cardId === id && !invoice.paidTransactionId).map((invoice) => invoice.key));
+    const openInvoiceKeys = new Set(creditCardInvoices.filter((invoice) => invoice.cardId === id && invoice.paidTransactionId === undefined).map((invoice) => invoice.key));
     setCreditCardData((current) => ({
       ...current,
-      cards: card.id
+      cards: card.id !== undefined
         ? current.cards.map((item) => item.id === id ? { ...card, id } : item)
         : [{ ...card, id }, ...current.cards],
       dueDateOverrides: billingCycleChanged
@@ -1102,7 +1145,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
         }, {})
         : current.dueDateOverrides || {},
     }));
-    announce(billingCycleChanged ? "Dia do cartão atualizado; as faturas em aberto foram ajustadas." : card.id ? "Cartão atualizado." : "Cartão adicionado.");
+    announce(billingCycleChanged ? "Dia do cartão atualizado; as faturas em aberto foram ajustadas." : card.id !== undefined ? "Cartão atualizado." : "Cartão adicionado.");
   }
 
   function deleteCreditCard(id: number) {
@@ -1176,7 +1219,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
       announce("Encerre a recorrência antes de excluir a compra que a originou.");
       return;
     }
-    const alreadyPaid = creditCardInvoices.some((invoice) => Boolean(invoice.paidTransactionId) && invoice.lines.some((line) => line.purchaseId === id));
+    const alreadyPaid = creditCardInvoices.some((invoice) => invoice.paidTransactionId !== undefined && invoice.lines.some((line) => line.purchaseId === id));
     if (alreadyPaid) {
       announce("Esta compra já possui uma parcela paga e foi mantida no histórico.");
       return;
@@ -1188,7 +1231,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
 
   function changeCardInvoiceDueDate(invoiceKey: string, dueDate: string) {
     const invoice = creditCardInvoices.find((item) => item.key === invoiceKey);
-    if (!invoice || invoice.paidTransactionId || !/^\d+:\d{4}-\d{2}$/.test(invoiceKey)) return;
+    if (!invoice || invoice.paidTransactionId !== undefined || !/^\d+:\d{4}-\d{2}$/.test(invoiceKey)) return;
     if (!isDateInputValue(dueDate)) {
       announce("Escolha uma data válida no calendário para atualizar o vencimento.");
       return;
@@ -1203,7 +1246,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
   function payCreditCardInvoice(invoiceToPay: CreditCardInvoice) {
     const invoice = creditCardInvoices.find((item) => item.key === invoiceToPay.key);
     const card = creditCardData.cards.find((item) => item.id === invoice?.cardId);
-    if (!invoice || !card || invoice.paidTransactionId || invoice.amount <= 0) return;
+    if (!invoice || !card || invoice.paidTransactionId !== undefined || invoice.amount <= 0) return;
     const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(`${invoice.month}-01T12:00:00`));
     if (!window.confirm(`Registrar a fatura de ${card.name} (${monthLabel}) no valor de ${formatCurrency(invoice.amount)} como despesa? O pagamento será incluído no histórico e liberará limite.`)) return;
     const transactionId = Date.now();
@@ -1223,6 +1266,48 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
       ],
     }));
     announce("Fatura registrada como despesa e limite atualizado.");
+  }
+
+  function undoCreditCardInvoicePayment(invoiceToUndo: CreditCardInvoice) {
+    const linkedDebtPaymentIds = debts.flatMap((debt) => debt.installments
+      .flatMap((installment) => installment.paidTransactionId === undefined ? [] : [installment.paidTransactionId]));
+    const validation = checkSafeInvoicePaymentUndo(invoiceToUndo, creditCardData.payments, transactions, linkedDebtPaymentIds);
+    if (!validation.ok) {
+      if (validation.reason === "invoice-not-paid") return;
+      const detail = validation.reason === "transaction-not-found"
+        ? "O lançamento de despesa associado não foi encontrado."
+        : validation.reason === "transaction-not-expense"
+          ? "O lançamento associado não está classificado como despesa."
+          : validation.reason === "transaction-category-mismatch"
+            ? "O lançamento associado não está na categoria de faturas de cartão."
+            : validation.reason === "transaction-linked-to-installment"
+              ? "O mesmo identificador também está vinculado a uma parcela de dívida."
+          : validation.reason === "transaction-id-ambiguous"
+            ? "Há mais de um lançamento com o identificador do pagamento."
+            : "O vínculo entre a fatura e o pagamento está ausente ou duplicado.";
+      announce(`${detail} Nada foi alterado; a fatura continua paga.`);
+      return;
+    }
+
+    const card = creditCardData.cards.find((item) => item.id === invoiceToUndo.cardId);
+    if (!card) {
+      announce("O cartão desta fatura não foi encontrado. Nada foi alterado.");
+      return;
+    }
+    const monthLabel = new Intl.DateTimeFormat("pt-BR", { month: "long", year: "numeric" }).format(new Date(`${invoiceToUndo.month}-01T12:00:00`));
+    const paymentTransaction = transactions.find((transaction) => transaction.id === validation.transactionId)!;
+    if (!window.confirm(`Desfazer o pagamento da fatura de ${card.name} (${monthLabel})? O lançamento “${paymentTransaction.title}” será removido do histórico, o saldo será recalculado e a fatura reaberta. As compras e o vencimento serão preservados.`)) return;
+
+    setTransactions((current) => current.filter((transaction) => transaction.id !== validation.transactionId));
+    setCreditCardData((current) => ({
+      ...current,
+      payments: current.payments.filter((payment) => !(
+        payment.cardId === invoiceToUndo.cardId
+        && payment.month === invoiceToUndo.month
+        && payment.paidTransactionId === validation.transactionId
+      )),
+    }));
+    announce("Pagamento desfeito. Fatura reaberta; compras e vencimento preservados, saldo e limite atualizados.");
   }
 
   function createGoal(title: string, targetAmount: number) {
@@ -1312,7 +1397,7 @@ export default function Dashboard({ user, initialRevision, initialPending, offli
                 <div className="transaction-list">{visibleTransactions.length ? (showAllTransactions ? visibleTransactions : visibleTransactions.slice(0, 5)).map((transaction) => <TransactionRow key={transaction.id} transaction={transaction} onDelete={() => deleteTransaction(transaction.id)} />) : <p className="empty-state">Nenhuma transação encontrada.</p>}</div>
               </section>
               <DebtManager debts={debts} categories={categories} onSave={saveDebt} onDelete={deleteDebt} onPay={payInstallment} onDueDateChange={changeInstallmentDueDate} />
-              <CreditCardManager cards={creditCardData.cards} purchases={creditCardData.purchases} payments={creditCardData.payments} recurringCharges={creditCardData.recurringCharges || []} dueDateOverrides={creditCardData.dueDateOverrides || {}} categories={categories.expense} hidden={hidden} onSaveCard={saveCreditCard} onDeleteCard={deleteCreditCard} onSavePurchase={saveCardPurchase} onStartRecurring={startExistingRecurringCharge} onStopRecurring={stopRecurringCharge} onDeletePurchase={deleteCardPurchase} onChangeInvoiceDueDate={changeCardInvoiceDueDate} onPayInvoice={payCreditCardInvoice} />
+              <CreditCardManager cards={creditCardData.cards} purchases={creditCardData.purchases} payments={creditCardData.payments} recurringCharges={creditCardData.recurringCharges || []} dueDateOverrides={creditCardData.dueDateOverrides || {}} categories={categories.expense} hidden={hidden} onSaveCard={saveCreditCard} onDeleteCard={deleteCreditCard} onSavePurchase={saveCardPurchase} onStartRecurring={startExistingRecurringCharge} onStopRecurring={stopRecurringCharge} onDeletePurchase={deleteCardPurchase} onChangeInvoiceDueDate={changeCardInvoiceDueDate} onPayInvoice={payCreditCardInvoice} onUndoInvoicePayment={undoCreditCardInvoicePayment} />
             </div>
 
             <div className="dashboard-side-column">
